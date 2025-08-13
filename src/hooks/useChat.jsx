@@ -1,34 +1,57 @@
 import { createContext, useContext, useEffect, useState } from "react";
-
-const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { useAgora } from "./useAgora";
 
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
-  const chat = async (message) => {
-    setLoading(true);
-    const data = await fetch(`${backendUrl}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ message }),
-    });
-    const resp = (await data.json()).messages;
-    setMessages((messages) => [...messages, ...resp]);
-    setLoading(false);
-  };
+  const { sendMessageToConvoAI, isConnected } = useAgora();
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState();
   const [loading, setLoading] = useState(false);
   const [cameraZoomed, setCameraZoomed] = useState(true);
+
+  const chat = async (messageText) => {
+    if (!isConnected) {
+      console.warn('Not connected to Agora channel');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Send message to ConvoAI instead of traditional backend
+      await sendMessageToConvoAI(messageText);
+      
+      // Add user message to local state for display
+      const userMessage = {
+        text: messageText,
+        audio: null,
+        lipsync: null,
+        animation: "Talking_0",
+        facialExpression: "default",
+        sender: "user"
+      };
+      
+      setMessages((messages) => [...messages, userMessage]);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onMessagePlayed = () => {
     setMessages((messages) => messages.slice(1));
   };
 
   useEffect(() => {
     if (messages.length > 0) {
-      setMessage(messages[0]);
+      // Only set AI messages for avatar playback, skip user messages
+      const aiMessages = messages.filter(msg => msg.sender !== "user");
+      if (aiMessages.length > 0) {
+        setMessage(aiMessages[0]);
+      } else {
+        setMessage(null);
+      }
     } else {
       setMessage(null);
     }

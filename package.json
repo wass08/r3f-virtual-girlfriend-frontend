@@ -13,10 +13,12 @@
     "@react-three/fiber": "8.13.3",
     "@react-three/xr": "^5.7.1",
     "@types/three": "0.152.1",
+    "agora-rtc-sdk-ng": "^4.24.0",
     "leva": "^0.9.35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "three": "0.153.0"
+    "three": "0.153.0",
+    "wawa-lipsync": "^0.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.0.27",

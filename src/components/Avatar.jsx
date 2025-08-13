@@ -160,7 +160,6 @@ export function Avatar(props) {
           value,
           speed
         );
-
         if (!setupMode) {
           try {
             set({

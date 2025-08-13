@@ -37,7 +37,7 @@ const Dots = (props) => {
   );
 };
 
-export const Experience = () => {
+export const Experience = ({ currentExpression, currentAnimation }) => {
   const cameraControls = useRef();
   const { cameraZoomed } = useChat();
 
@@ -60,7 +60,12 @@ export const Experience = () => {
       <Suspense>
         <Dots position-y={1.75} position-x={-0.02} />
       </Suspense>
-      <Avatar />
+      <Suspense fallback={null}>
+        <Avatar 
+          currentExpression={currentExpression} 
+          currentAnimation={currentAnimation}
+        />
+      </Suspense>
       <ContactShadows opacity={0.7} />
     </>
   );
