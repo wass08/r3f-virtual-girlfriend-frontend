@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import * as THREE from "three";
 import { useChat } from "../hooks/useChat";
+import { useAgora } from "../hooks/useAgora";
 
 const facialExpressions = {
   default: {},
@@ -112,6 +113,7 @@ export function Avatar(props) {
   );
 
   const { message, onMessagePlayed, chat } = useChat();
+  const { lipSyncData, audioLevel } = useAgora(); // Get WebAudio lip sync data
 
   const [lipsync, setLipsync] = useState();
 
@@ -194,13 +196,35 @@ export function Avatar(props) {
     lerpMorphTarget("eyeBlinkLeft", blink || winkLeft ? 1 : 0, 0.5);
     lerpMorphTarget("eyeBlinkRight", blink || winkRight ? 1 : 0, 0.5);
 
-    // LIPSYNC
+    // LIPSYNC - WebAudio based
     if (setupMode) {
       return;
     }
 
     const appliedMorphTargets = [];
-    if (message && lipsync) {
+    
+    // Use WebAudio lip sync data if available
+    if (lipSyncData && lipSyncData.viseme && audioLevel > 0.01) {
+      const visemeTarget = corresponding[lipSyncData.viseme];
+      if (visemeTarget) {
+        appliedMorphTargets.push(visemeTarget);
+        // Use the mouth open value from WebAudio analysis with some scaling
+        const intensity = Math.min(lipSyncData.mouthOpen * 1.5, 1.0);
+        lerpMorphTarget(visemeTarget, intensity, 0.3);
+      }
+      
+      // Apply additional mouth movements from WebAudio
+      if (lipSyncData.jawOpen > 0.1) {
+        lerpMorphTarget("jawOpen", lipSyncData.jawOpen * 0.8, 0.2);
+      }
+      
+      if (lipSyncData.mouthSmile > 0.1) {
+        lerpMorphTarget("mouthSmileLeft", lipSyncData.mouthSmile * 0.6, 0.2);
+        lerpMorphTarget("mouthSmileRight", lipSyncData.mouthSmile * 0.6, 0.2);
+      }
+    }
+    // Fallback to original message-based lip sync
+    else if (message && lipsync) {
       const currentAudioTime = audio.currentTime;
       for (let i = 0; i < lipsync.mouthCues.length; i++) {
         const mouthCue = lipsync.mouthCues[i];
@@ -215,12 +239,20 @@ export function Avatar(props) {
       }
     }
 
+    // Reset unused morph targets
     Object.values(corresponding).forEach((value) => {
       if (appliedMorphTargets.includes(value)) {
         return;
       }
       lerpMorphTarget(value, 0, 0.1);
     });
+    
+    // Reset jaw and smile when no audio
+    if (!lipSyncData || audioLevel <= 0.01) {
+      lerpMorphTarget("jawOpen", 0, 0.1);
+      lerpMorphTarget("mouthSmileLeft", 0, 0.1);
+      lerpMorphTarget("mouthSmileRight", 0, 0.1);
+    }
   });
 
   useControls("FacialExpressions", {
