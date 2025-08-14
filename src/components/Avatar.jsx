@@ -15,13 +15,13 @@ import { useAgora } from "../hooks/useAgora";
 const facialExpressions = {
   default: {},
   smile: {
-    browInnerUp: 0.17,
-    eyeSquintLeft: 0.4,
-    eyeSquintRight: 0.44,
-    noseSneerLeft: 0.1700000727403593,
-    noseSneerRight: 0.14000002836874015,
-    mouthPressLeft: 0.61,
-    mouthPressRight: 0.41000000000000003,
+    browInnerUp: 0.15,
+    eyeSquintLeft: 0.3,
+    eyeSquintRight: 0.3,
+    mouthSmileLeft: 0.8,
+    mouthSmileRight: 0.8,
+    cheekSquintLeft: 0.4,
+    cheekSquintRight: 0.4,
   },
   funnyFace: {
     jawLeft: 0.63,
@@ -188,6 +188,25 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
       const animationExists = animations.find(a => a.name === currentAnimation);
       if (animationExists) {
         setAnimation(currentAnimation);
+        
+        // Auto-map animation to facial expression if no manual expression override
+        if (!currentExpression) {
+          const animationToExpressionMap = {
+            "Idle": "",
+            "Laughing": "funnyFace",
+            "Crying": "sad", 
+            "Angry": "angry",
+            "Terrified": "surprised",
+            "Talking_0": "",
+            "Talking_1": "smile",
+            "Talking_2": "surprised"
+          };
+          
+          const mappedExpression = animationToExpressionMap[currentAnimation];
+          if (mappedExpression !== undefined) {
+            setFacialExpression(mappedExpression);
+          }
+        }
       } else {
         console.warn(`Animation "${currentAnimation}" not found. Available animations:`, animations.map(a => a.name));
         // Fallback to Idle if animation doesn't exist
@@ -196,7 +215,7 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
     } else if (!message) {
       setAnimation("Idle");
     }
-  }, [currentAnimation, message, animations]);
+  }, [currentAnimation, message, animations, currentExpression]);
   
   useEffect(() => {
     // Additional safety check before playing animation
