@@ -105,9 +105,30 @@ const corresponding = {
   X: "viseme_PP",
 };
 
+// Enhanced mouth morph targets for more realistic speech
+const mouthMorphTargets = {
+  // Vowel sounds - wider mouth shapes
+  A: { jawOpen: 0.7, mouthOpen: 0.8, mouthWide: 0.5 },
+  E: { jawOpen: 0.4, mouthOpen: 0.6, mouthWide: 0.7, mouthSmileLeft: 0.3, mouthSmileRight: 0.3 },
+  I: { jawOpen: 0.2, mouthOpen: 0.3, mouthWide: 0.8, mouthSmileLeft: 0.5, mouthSmileRight: 0.5 },
+  O: { jawOpen: 0.5, mouthOpen: 0.7, mouthFunnel: 0.6, mouthPucker: 0.4 },
+  U: { jawOpen: 0.3, mouthOpen: 0.4, mouthFunnel: 0.8, mouthPucker: 0.7 },
+  
+  // Consonant sounds
+  B: { mouthPressLeft: 0.8, mouthPressRight: 0.8, mouthClose: 0.9 },
+  C: { jawOpen: 0.2, mouthOpen: 0.3 },
+  D: { jawOpen: 0.3, mouthOpen: 0.4, tongueOut: 0.2 },
+  F: { jawOpen: 0.1, mouthOpen: 0.2, mouthFunnel: 0.3 },
+  G: { jawOpen: 0.4, mouthOpen: 0.5 },
+  H: { jawOpen: 0.3, mouthOpen: 0.4 },
+  
+  // Default/silence
+  X: { jawOpen: 0.05, mouthOpen: 0.1 }
+};
+
 let setupMode = false;
 
-export function Avatar(props) {
+export function Avatar({ currentExpression, currentAnimation, ...props }) {
   const { nodes, materials, scene } = useGLTF(
     `${import.meta.env.BASE_URL}models/64f1a714fe61576b46f27ca2.glb`
   );
@@ -116,36 +137,83 @@ export function Avatar(props) {
   const { lipSyncData, audioLevel } = useAgora(); // Get WebAudio lip sync data
 
   const [lipsync, setLipsync] = useState();
+  
+  // Smoothing states for lip sync
+  const smoothedAudioLevel = useRef(0);
+  const lastViseme = useRef('X');
+  const visemeTransition = useRef(0);
+  const mouthTargetValues = useRef({});
 
   useEffect(() => {
     console.log(message);
     if (!message) {
-      setAnimation("Idle");
+      // If no manual animation override, use Idle
+      if (!currentAnimation) {
+        setAnimation("Idle");
+      }
       return;
     }
-    setAnimation(message.animation);
-    setFacialExpression(message.facialExpression);
+    // During message playback, use message animation if no manual override
+    if (!currentAnimation) {
+      setAnimation(message.animation);
+    }
+    // Use message facial expression if no manual override
+    if (!currentExpression) {
+      setFacialExpression(message.facialExpression);
+    }
     setLipsync(message.lipsync);
     const audio = new Audio("data:audio/mp3;base64," + message.audio);
     audio.play();
     setAudio(audio);
     audio.onended = onMessagePlayed;
-  }, [message]);
+  }, [message, currentAnimation, currentExpression]);
 
   const { animations } = useGLTF(`${import.meta.env.BASE_URL}models/animations.glb`);
+
+  // Debug: Log available animations to help fix UI
+  useEffect(() => {
+    console.log('Available animations:', animations.map(a => a.name));
+  }, [animations]);
 
   const group = useRef();
   const { actions, mixer } = useAnimations(animations, group);
   const [animation, setAnimation] = useState(
     animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name // Check if Idle animation exists otherwise use first animation
   );
+  
+  // Update animation when currentAnimation prop changes
   useEffect(() => {
-    actions[animation]
-      .reset()
-      .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
-      .play();
-    return () => actions[animation].fadeOut(0.5);
-  }, [animation]);
+    if (currentAnimation) {
+      // Check if the animation exists before trying to set it
+      const animationExists = animations.find(a => a.name === currentAnimation);
+      if (animationExists) {
+        setAnimation(currentAnimation);
+      } else {
+        console.warn(`Animation "${currentAnimation}" not found. Available animations:`, animations.map(a => a.name));
+        // Fallback to Idle if animation doesn't exist
+        setAnimation("Idle");
+      }
+    } else if (!message) {
+      setAnimation("Idle");
+    }
+  }, [currentAnimation, message, animations]);
+  
+  useEffect(() => {
+    // Additional safety check before playing animation
+    if (actions[animation]) {
+      actions[animation]
+        .reset()
+        .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
+        .play();
+      return () => {
+        if (actions[animation]) {
+          actions[animation].fadeOut(0.5);
+        }
+      };
+    } else {
+      console.warn(`Animation action "${animation}" not found in actions:`, Object.keys(actions));
+    }
+  }, [animation, actions]);
 
   const lerpMorphTarget = (target, value, speed = 0.1) => {
     scene.traverse((child) => {
@@ -173,13 +241,41 @@ export function Avatar(props) {
     });
   };
 
+  // Enhanced smooth interpolation for mouth targets with easing
+  const smoothLerpMouthTarget = (target, targetValue, deltaTime) => {
+    if (!mouthTargetValues.current[target]) {
+      mouthTargetValues.current[target] = 0;
+    }
+    
+    // Faster interpolation with more visible movements
+    const isOpening = targetValue > mouthTargetValues.current[target];
+    const smoothSpeed = isOpening ? 15.0 : 18.0; // Much faster for more visible changes
+    
+    mouthTargetValues.current[target] = THREE.MathUtils.lerp(
+      mouthTargetValues.current[target],
+      targetValue,
+      1 - Math.exp(-smoothSpeed * deltaTime)
+    );
+    
+    lerpMorphTarget(target, mouthTargetValues.current[target], 0.9); // Higher lerp factor
+  };
+
   const [blink, setBlink] = useState(false);
   const [winkLeft, setWinkLeft] = useState(false);
   const [winkRight, setWinkRight] = useState(false);
   const [facialExpression, setFacialExpression] = useState("");
   const [audio, setAudio] = useState();
 
-  useFrame(() => {
+  // Update facial expression when currentExpression prop changes
+  useEffect(() => {
+    if (currentExpression) {
+      setFacialExpression(currentExpression);
+    } else if (!message) {
+      setFacialExpression(""); // Reset to default when no override and no message
+    }
+  }, [currentExpression, message]);
+
+  useFrame((state, deltaTime) => {
     !setupMode &&
       Object.keys(nodes.EyeLeft.morphTargetDictionary).forEach((key) => {
         const mapping = facialExpressions[facialExpression];
@@ -196,34 +292,64 @@ export function Avatar(props) {
     lerpMorphTarget("eyeBlinkLeft", blink || winkLeft ? 1 : 0, 0.5);
     lerpMorphTarget("eyeBlinkRight", blink || winkRight ? 1 : 0, 0.5);
 
-    // LIPSYNC - WebAudio based
+    // LIPSYNC - WebAudio based with smooth interpolation
     if (setupMode) {
       return;
     }
 
+    // Smooth the audio level to reduce jittering but keep it responsive
+    const targetAudioLevel = audioLevel || 0;
+    smoothedAudioLevel.current = THREE.MathUtils.lerp(
+      smoothedAudioLevel.current,
+      targetAudioLevel,
+      1 - Math.exp(-15 * deltaTime) // Faster response for more visible changes
+    );
+
     const appliedMorphTargets = [];
     
     // Use WebAudio lip sync data if available
-    if (lipSyncData && lipSyncData.viseme && audioLevel > 0.01) {
-      const visemeTarget = corresponding[lipSyncData.viseme];
+    if (lipSyncData && lipSyncData.viseme && smoothedAudioLevel.current > 0.01) {
+      const currentViseme = lipSyncData.viseme;
+      const visemeTarget = corresponding[currentViseme];
+      const mouthShape = mouthMorphTargets[currentViseme];
+      
+      // Handle viseme transitions more quickly
+      if (lastViseme.current !== currentViseme) {
+        visemeTransition.current = 0;
+        lastViseme.current = currentViseme;
+      }
+      visemeTransition.current = Math.min(visemeTransition.current + deltaTime * 12, 1); // Doubled transition speed
+      
       if (visemeTarget) {
         appliedMorphTargets.push(visemeTarget);
-        // Use the mouth open value from WebAudio analysis with some scaling
-        const intensity = Math.min(lipSyncData.mouthOpen * 1.5, 1.0);
-        lerpMorphTarget(visemeTarget, intensity, 0.3);
+        const intensity = Math.min(smoothedAudioLevel.current * 2.0, 1.0) * visemeTransition.current; // Doubled intensity
+        lerpMorphTarget(visemeTarget, intensity, 0.8);
       }
       
-      // Apply additional mouth movements from WebAudio
-      if (lipSyncData.jawOpen > 0.1) {
-        lerpMorphTarget("jawOpen", lipSyncData.jawOpen * 0.8, 0.2);
+      // Apply enhanced mouth shapes with smooth interpolation and higher intensity
+      if (mouthShape) {
+        Object.entries(mouthShape).forEach(([morphTarget, value]) => {
+          const smoothedIntensity = value * smoothedAudioLevel.current * 4 * visemeTransition.current; // Quadrupled intensity
+          const clampedIntensity = Math.min(smoothedIntensity, value * 1.2); // Allow slightly over the base value
+          smoothLerpMouthTarget(morphTarget, clampedIntensity, deltaTime);
+          appliedMorphTargets.push(morphTarget);
+        });
       }
       
-      if (lipSyncData.mouthSmile > 0.1) {
-        lerpMorphTarget("mouthSmileLeft", lipSyncData.mouthSmile * 0.6, 0.2);
-        lerpMorphTarget("mouthSmileRight", lipSyncData.mouthSmile * 0.6, 0.2);
-      }
+      // More pronounced jaw movement
+      const breathingVariation = Math.sin(state.clock.elapsedTime * 2) * 0.1;
+      const baseJawOpen = (mouthShape?.jawOpen || 0.3) + breathingVariation;
+      const jawIntensity = baseJawOpen * smoothedAudioLevel.current * 3.0 * visemeTransition.current; // Tripled intensity
+      smoothLerpMouthTarget("jawOpen", Math.min(jawIntensity, 1.0), deltaTime);
+      
+      // More visible mouth width variation
+      const mouthWidth = smoothedAudioLevel.current * 0.8 * visemeTransition.current; // Doubled width
+      smoothLerpMouthTarget("mouthLeft", mouthWidth, deltaTime);
+      smoothLerpMouthTarget("mouthRight", mouthWidth, deltaTime);
+      
+      appliedMorphTargets.push("jawOpen", "mouthLeft", "mouthRight");
     }
-    // Fallback to original message-based lip sync
+    // Fallback to original message-based lip sync with smoothing
     else if (message && lipsync) {
       const currentAudioTime = audio.currentTime;
       for (let i = 0; i < lipsync.mouthCues.length; i++) {
@@ -232,26 +358,53 @@ export function Avatar(props) {
           currentAudioTime >= mouthCue.start &&
           currentAudioTime <= mouthCue.end
         ) {
-          appliedMorphTargets.push(corresponding[mouthCue.value]);
-          lerpMorphTarget(corresponding[mouthCue.value], 1, 0.2);
+          const visemeValue = mouthCue.value;
+          const visemeTarget = corresponding[visemeValue];
+          const mouthShape = mouthMorphTargets[visemeValue];
+          
+          if (visemeTarget) {
+            appliedMorphTargets.push(visemeTarget);
+            lerpMorphTarget(visemeTarget, 1, 0.4);
+          }
+          
+          // Apply enhanced mouth shapes with smooth transitions
+          if (mouthShape) {
+            Object.entries(mouthShape).forEach(([morphTarget, value]) => {
+              smoothLerpMouthTarget(morphTarget, value, deltaTime);
+              appliedMorphTargets.push(morphTarget);
+            });
+          }
           break;
         }
       }
     }
 
-    // Reset unused morph targets
+    // Reset unused morph targets with smooth transitions
     Object.values(corresponding).forEach((value) => {
       if (appliedMorphTargets.includes(value)) {
         return;
       }
-      lerpMorphTarget(value, 0, 0.1);
+      lerpMorphTarget(value, 0, 0.2);
     });
     
-    // Reset jaw and smile when no audio
-    if (!lipSyncData || audioLevel <= 0.01) {
-      lerpMorphTarget("jawOpen", 0, 0.1);
-      lerpMorphTarget("mouthSmileLeft", 0, 0.1);
-      lerpMorphTarget("mouthSmileRight", 0, 0.1);
+    // Smoothly reset mouth morph targets when no audio
+    const allMouthTargets = [
+      "jawOpen", "mouthOpen", "mouthWide", "mouthSmileLeft", "mouthSmileRight",
+      "mouthFunnel", "mouthPucker", "mouthPressLeft", "mouthPressRight", 
+      "mouthClose", "tongueOut", "mouthLeft", "mouthRight"
+    ];
+    
+    allMouthTargets.forEach((target) => {
+      if (!appliedMorphTargets.includes(target)) {
+        smoothLerpMouthTarget(target, 0, deltaTime);
+      }
+    });
+    
+    // Smooth reset when no audio activity
+    if (!lipSyncData || smoothedAudioLevel.current <= 0.01) {
+      // Gentle reset to slightly open mouth for natural look
+      smoothLerpMouthTarget("jawOpen", 0.02, deltaTime);
+      smoothLerpMouthTarget("mouthOpen", 0.01, deltaTime);
     }
   });
 

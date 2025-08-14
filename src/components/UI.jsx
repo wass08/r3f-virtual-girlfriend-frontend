@@ -29,7 +29,7 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
   // Available animations for the avatar (based on the files in public/animations)
   const availableAnimations = [
     { name: "Idle", label: "🧘 Idle", emoji: "🧘" },
-    { name: "Standing Idle", label: "🚶 Standing", emoji: "🚶" },
+    // { name: "Standing Idle", label: "🚶 Standing", emoji: "🚶" }, // Temporarily disabled - may cause crashes
     { name: "Talking_0", label: "💬 Talking 1", emoji: "💬" },
     { name: "Talking_1", label: "🗣️ Talking 2", emoji: "🗣️" },
     { name: "Talking_2", label: "💭 Talking 3", emoji: "💭" },
@@ -37,7 +37,7 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
     { name: "Crying", label: "😭 Crying", emoji: "😭" },
     { name: "Angry", label: "😡 Angry", emoji: "😡" },
     { name: "Terrified", label: "😨 Terrified", emoji: "😨" },
-    { name: "Rumba Dancing", label: "💃 Dancing", emoji: "💃" },
+    // { name: "Rumba Dancing", label: "💃 Dancing", emoji: "💃" }, // Temporarily disabled - may cause crashes
   ];
 
   const sendMessage = () => {
@@ -105,11 +105,9 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
                     {config?.hasTTSKey ? '✅' : '❌'} TTS
                   </p>
                 </div>
-                {audioLevel > 0 && (
-                  <p className="text-blue-600">
-                    🎤 Audio Level: {(audioLevel * 100).toFixed(1)}%
-                  </p>
-                )}
+                <p className="text-blue-600">
+                  🎤 Audio Level: {(audioLevel * 100).toFixed(1)}%
+                </p>
               </div>
             )}
           </div>
@@ -256,21 +254,6 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
           </div>
           {showAnimationPanel && (
             <>
-              <div className="mb-3 p-2 bg-blue-50 rounded-md">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-blue-700 font-medium">
-                    🤖 Auto-Animation: Talking animations during speech, idle during silence
-                  </p>
-                  {currentAnimation && (
-                    <button
-                      onClick={() => setCurrentAnimation("")}
-                      className="pointer-events-auto text-xs bg-blue-200 hover:bg-blue-300 text-blue-800 px-2 py-1 rounded transition-colors"
-                    >
-                      Reset to Auto
-                    </button>
-                  )}
-                </div>
-              </div>
               <div className="grid grid-cols-3 gap-2">
                 {availableAnimations.map((anim) => (
                   <button
