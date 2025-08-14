@@ -9,11 +9,6 @@ const getConfigValue = (key, defaultValue = null) => {
   const envValue = import.meta.env[key];
   const result = sessionValue || envValue || defaultValue;
   
-  // Debug logging
-  if (key.includes('API_KEY') || key.includes('PASSWORD') || key.includes('RESTFUL')) {
-    console.log(`Config ${key}: ${result ? 'SET' : 'MISSING'} (session: ${sessionValue ? 'SET' : 'MISSING'}, env: ${envValue ? 'SET' : 'MISSING'})`);
-  }
-  
   return result;
 };
 
@@ -77,33 +72,6 @@ const generateBasicAuthHeader = () => {
   // PRIORITY 2: Generate from API Key + Password
   const apiKey = config.apiKey;
   const password = config.password;
-  
-  // ENHANCED DEBUGGING - Let's see exactly what's happening
-  console.log('🔍 FULL CONFIG DEBUG:', {
-    sessionStorageRESTFUL_API_KEY: sessionStorage.getItem('VITE_RESTFUL_API_KEY'),
-    sessionStorageRESTFUL_PASSWORD: sessionStorage.getItem('VITE_RESTFUL_PASSWORD'),
-    sessionStorageAUTH_CODE: sessionStorage.getItem('VITE_AUTH_CODE'),
-    envRESTFUL_API_KEY: import.meta.env.VITE_RESTFUL_API_KEY,
-    envRESTFUL_PASSWORD: import.meta.env.VITE_RESTFUL_PASSWORD,
-    envAUTH_CODE: import.meta.env.VITE_AUTH_CODE,
-    configApiKey: apiKey,
-    configPassword: password,
-    configAuthCode: config.authCode,
-    configApiKeyType: typeof apiKey,
-    configPasswordType: typeof password
-  });
-  
-  // Detailed debugging of raw values
-  console.log('🔍 Raw credential debug:', {
-    apiKey: apiKey ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length-4)}` : 'MISSING',
-    apiKeyLength: apiKey ? apiKey.length : 0,
-    apiKeyType: typeof apiKey,
-    password: password ? `${password.substring(0, 2)}***${password.substring(password.length-2)}` : 'MISSING',
-    passwordLength: password ? password.length : 0,
-    passwordType: typeof password,
-    apiKeyHasWhitespace: apiKey ? /\s/.test(apiKey) : false,
-    passwordHasWhitespace: password ? /\s/.test(password) : false
-  });
   
   // Validate that both credentials exist and are not empty
   if (!apiKey || !password || apiKey.trim() === '' || password.trim() === '') {
@@ -407,11 +375,6 @@ export const AgoraProvider = ({ children }) => {
                   // Calculate average audio level (0-1)
                   const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
                   const normalizedLevel = average / 255;
-                  
-                  // Debug audio levels occasionally
-                  if (Math.random() < 0.01) { // 1% chance to log
-                    console.log('🎵 ConvoAI audio level:', normalizedLevel.toFixed(3), 'Raw average:', average.toFixed(1));
-                  }
                   
                   setAudioLevel(normalizedLevel);
                   
