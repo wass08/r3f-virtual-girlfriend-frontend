@@ -24,12 +24,6 @@ jobs:
 
     - name: Build
       run: npm run build
-      env:
-        VITE_AGORA_APP_ID: ${{ secrets.VITE_AGORA_APP_ID }}
-        VITE_AGORA_TOKEN: ${{ secrets.VITE_AGORA_TOKEN }}
-        VITE_CONVOAI_API_URL: ${{ secrets.VITE_CONVOAI_API_URL }}
-        VITE_RESTFUL_USERNAME: ${{ secrets.VITE_RESTFUL_USERNAME }}
-        VITE_RESTFUL_PASSWORD: ${{ secrets.VITE_RESTFUL_PASSWORD }}
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
