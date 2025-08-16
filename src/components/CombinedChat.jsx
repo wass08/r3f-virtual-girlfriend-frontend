@@ -5,7 +5,7 @@ import { useChat } from "../hooks/useChat";
 export const CombinedChat = ({ isConnected }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true);
-  const { chatHistory, clearChatHistory } = useAgora();
+  const { chatHistory, clearChatHistory, testChatMessage } = useAgora();
   const { chat, loading, message } = useChat();
   const messagesEndRef = useRef(null);
   const input = useRef();
@@ -80,6 +80,13 @@ export const CombinedChat = ({ isConnected }) => {
             </h3>
             <div className="flex items-center gap-1">
               <button
+                onClick={testChatMessage}
+                className="text-white/70 hover:text-white text-sm px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                title="Add test message"
+              >
+                🧪
+              </button>
+              <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="text-white/70 hover:text-white text-sm px-2 py-1 rounded hover:bg-white/10 transition-colors"
                 title={isExpanded ? "Collapse" : "Expand"}
@@ -118,7 +125,6 @@ export const CombinedChat = ({ isConnected }) => {
                       message.speaker === 'user' ? 'items-end' : 'items-start'
                     }`}
                   >
-                    {/* Message bubble */}
                     <div
                       className={`max-w-[80%] p-2 rounded-lg text-sm ${
                         message.speaker === 'user'
@@ -126,24 +132,19 @@ export const CombinedChat = ({ isConnected }) => {
                           : 'bg-gray-700/80 text-white mr-4'
                       }`}
                     >
-                      <p className="leading-relaxed break-words">{message.message}</p>
-                      
-                      {/* Word-level details for protobuf messages */}
-                      {message.words && message.words.length > 0 && (
-                        <div className="mt-1 p-1 bg-black/30 rounded text-xs">
-                          <div className="text-white/70 mb-1">📝 Words:</div>
-                          <div className="space-y-0.5 max-h-16 overflow-y-auto">
-                            {message.words.map((word, wordIndex) => (
-                              <div key={`${message.id}-${index}-word-${wordIndex}`} className="flex justify-between text-xs">
-                                <span className="text-white/90">"{word.word}"</span>
-                                <span className="text-white/60 font-mono text-xs">
-                                  {word.start?.toFixed(1)}s-{word.end?.toFixed(1)}s
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <div className="flex items-start justify-between">
+                        <p className="leading-relaxed break-words flex-1">
+                          {message.message}
+                          {message.isPartial && (
+                            <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse opacity-70">|</span>
+                          )}
+                        </p>
+                        {message.isPartial && (
+                          <span className="text-xs text-white/50 ml-2 flex-shrink-0">
+                            ⚡ Live
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Timestamp and speaker */}
@@ -155,7 +156,17 @@ export const CombinedChat = ({ isConnected }) => {
                       <span className="font-medium">
                         {message.speaker === 'user' ? '👤' : '🤖'}
                       </span>
-                      <span className="ml-1">{formatTime(message.timestamp)}</span>
+                      <span className="ml-1">
+                        {message.lastUpdated ? 
+                          `${formatTime(message.lastUpdated)} ${message.isPartial ? '(live)' : ''}` :
+                          formatTime(message.timestamp)
+                        }
+                      </span>
+                      {message.words && message.words.length > 0 && (
+                        <span className="ml-2 text-white/40">
+                          • {message.words.length}w
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))

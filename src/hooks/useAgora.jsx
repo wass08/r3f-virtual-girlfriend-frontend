@@ -217,19 +217,45 @@ export const AgoraProvider = ({ children }) => {
   // Process complete message after all chunks are received
   const processCompleteMessage = async (messageId, completeMessageData) => {
     try {
-      console.log('🔍 Processing complete message:', messageId);
+      console.log('🔍 Processing complete message:', messageId, 'Length:', completeMessageData.length);
       
       // Load protobuf schema if not already loaded
       const { SomeMessage: MessageType } = await loadProtoSchema();
       
-      // Convert string to Uint8Array for protobuf
-      const buffer = new Uint8Array(completeMessageData.length);
-      for (let i = 0; i < completeMessageData.length; i++) {
-        buffer[i] = completeMessageData.charCodeAt(i);
+      // Convert base64 decoded string to proper Uint8Array
+      // The completeMessageData is already base64 decoded, but we need to handle it as binary data
+      let buffer;
+      try {
+        // Try to convert the string to proper byte array
+        // Since atob() returns a binary string, we need to convert each char to byte
+        buffer = new Uint8Array(completeMessageData.length);
+        for (let i = 0; i < completeMessageData.length; i++) {
+          buffer[i] = completeMessageData.charCodeAt(i) & 0xFF; // Mask to byte range
+        }
+        console.log('📦 Buffer created, length:', buffer.length, 'First few bytes:', Array.from(buffer.slice(0, 10)));
+        
+        // Basic validation: protobuf messages should not be empty and should have reasonable size
+        if (buffer.length === 0) {
+          throw new Error('Empty buffer - no data to decode');
+        }
+        if (buffer.length > 1000000) { // 1MB limit
+          throw new Error(`Buffer too large: ${buffer.length} bytes`);
+        }
+        
+      } catch (bufferError) {
+        console.error('❌ Buffer creation failed:', bufferError);
+        throw new Error(`Buffer creation failed: ${bufferError.message}`);
       }
       
       try {
-        // Try protobuf decoding first
+        // First, check if the data might actually be JSON (common case)
+        const trimmedData = completeMessageData.trim();
+        if (trimmedData.startsWith('{') && trimmedData.endsWith('}')) {
+          console.log('🔍 Data appears to be JSON, skipping protobuf decode');
+          throw new Error('Data appears to be JSON format');
+        }
+        
+        // Try protobuf decoding
         const protoMessage = MessageType.decode(buffer);
         console.log('📋 Protobuf decoded successfully:', protoMessage);
         
@@ -246,22 +272,26 @@ export const AgoraProvider = ({ children }) => {
             speaker: word.speaker ? 'user' : 'agent'
           }));
           
-          // Create transcript text from words
-          const transcriptText = wordDetails.map(w => w.word).join(' ');
-          const speaker = wordDetails.some(w => w.speaker === 'user') ? 'user' : 'agent';
+          // Only show actual words (filter out empty or very short words)
+          const meaningfulWords = wordDetails.filter(w => w.word && w.word.trim().length > 0);
           
-          console.log('📝 Transcript:', transcriptText);
-          
-          // Add to chat history
-          addMessageToChat({
-            id: messageId,
-            timestamp: new Date(),
-            speaker: speaker,
-            message: transcriptText.trim(),
-            type: 'transcript',
-            words: wordDetails,
-            raw: protoMessage
-          });
+          if (meaningfulWords.length > 0) {
+            const transcriptText = meaningfulWords.map(w => w.word).join(' ');
+            const speaker = meaningfulWords.some(w => w.speaker === 'user') ? 'user' : 'agent';
+            
+            console.log('📝 Real-time transcript update:', transcriptText);
+            
+            // Update existing message or create new one
+            addOrUpdateMessageInChat({
+              id: messageId,
+              timestamp: new Date(),
+              speaker: speaker,
+              message: transcriptText.trim(),
+              type: 'transcript',
+              words: meaningfulWords,
+              raw: protoMessage
+            });
+          }
           
         } else if (protoMessage.metadata) {
           console.log('📋 Found Metadata message:', protoMessage.metadata);
@@ -269,7 +299,13 @@ export const AgoraProvider = ({ children }) => {
         }
         
       } catch (protoError) {
-        console.warn('❌ Protobuf decode failed, trying JSON fallback:', protoError);
+        console.warn('❌ Protobuf decode failed, trying JSON fallback:', {
+          error: protoError.message,
+          bufferLength: buffer.length,
+          dataLength: completeMessageData.length,
+          firstBytes: Array.from(buffer.slice(0, 20)), // Show more bytes for debugging
+          errorType: protoError.constructor.name
+        });
         
         // Try JSON fallback
         try {
@@ -278,18 +314,35 @@ export const AgoraProvider = ({ children }) => {
           
           // Only process assistant.transcription messages
           if (messageDataJson.object === "assistant.transcription") {
+            console.log('✅ Processing assistant.transcription message');
+            
+            // Extract transcript and words
             const transcriptText = messageDataJson.transcript || messageDataJson.text || '';
             const speaker = messageDataJson.role === 'user' ? 'user' : 'agent';
             
-            if (transcriptText.trim()) {
-              console.log('✅ Adding assistant.transcription message to chat');
+            // Extract words if available
+            let wordDetails = [];
+            if (messageDataJson.words && Array.isArray(messageDataJson.words)) {
+              wordDetails = messageDataJson.words.map(word => ({
+                word: word.word || word.text || word,
+                start: word.start || word.start_time || 0,
+                end: word.end || word.end_time || 0,
+                confidence: word.confidence || 1.0,
+                speaker: word.speaker || speaker
+              })).filter(w => w.word && w.word.trim().length > 0);
+            }
+            
+            if (transcriptText.trim() || wordDetails.length > 0) {
+              console.log('📝 Real-time transcript update from JSON:', transcriptText);
               
-              addMessageToChat({
+              // Update existing message or create new one
+              addOrUpdateMessageInChat({
                 id: messageId,
                 timestamp: new Date(),
                 speaker: speaker,
-                message: transcriptText.trim(),
+                message: transcriptText.trim() || wordDetails.map(w => w.word).join(' '),
                 type: 'transcript',
+                words: wordDetails.length > 0 ? wordDetails : null,
                 raw: messageDataJson
               });
             }
@@ -298,7 +351,26 @@ export const AgoraProvider = ({ children }) => {
           }
           
         } catch (jsonError) {
-          console.warn('❌ Both protobuf and JSON decode failed:', jsonError);
+          console.warn('❌ Both protobuf and JSON decode failed:', {
+            jsonError: jsonError.message,
+            dataSnippet: completeMessageData.substring(0, 100) + '...', // Show first 100 chars
+            dataLength: completeMessageData.length,
+            isPrintable: /^[\x20-\x7E]*$/.test(completeMessageData.substring(0, 50)) // Check if printable ASCII
+          });
+          
+          // Last resort: treat as plain text if it looks like readable text
+          const trimmedData = completeMessageData.trim();
+          if (trimmedData.length > 0 && trimmedData.length < 10000) {
+            console.log('🔤 Treating as plain text message');
+            addOrUpdateMessageInChat({
+              id: messageId,
+              timestamp: new Date(),
+              speaker: 'agent',
+              message: trimmedData,
+              type: 'text',
+              raw: { originalData: completeMessageData }
+            });
+          }
         }
       }
       
@@ -310,19 +382,111 @@ export const AgoraProvider = ({ children }) => {
     }
   };
 
-  // Add message to chat with duplicate prevention
-  const addMessageToChat = (message) => {
-    setChatHistory(prev => {
-      // Check for duplicate by ID
-      const isDuplicate = prev.some(existing => existing.id === message.id);
-      if (isDuplicate) {
-        console.log('🔄 Skipping duplicate message ID:', message.id);
-        return prev;
+  // Process individual chunk for real-time updates (before complete message)
+  const processPartialMessage = async (messageId, partialData) => {
+    try {
+      // Try to decode partial data to show real-time progress
+      const { SomeMessage: MessageType } = await loadProtoSchema();
+      
+      const buffer = new Uint8Array(partialData.length);
+      for (let i = 0; i < partialData.length; i++) {
+        buffer[i] = partialData.charCodeAt(i);
       }
       
-      const newHistory = [...prev, message];
-      console.log('✅ Chat history updated, new length:', newHistory.length);
-      return newHistory;
+      try {
+        const protoMessage = MessageType.decode(buffer);
+        
+        if (protoMessage.words && protoMessage.words.words) {
+          const wordDetails = protoMessage.words.words
+            .map(word => ({
+              word: word.word,
+              start: word.start,
+              end: word.end,
+              confidence: word.confidence,
+              speaker: word.speaker ? 'user' : 'agent'
+            }))
+            .filter(w => w.word && w.word.trim().length > 0);
+          
+          if (wordDetails.length > 0) {
+            const speaker = wordDetails.some(w => w.speaker === 'user') ? 'user' : 'agent';
+            
+            console.log('⚡ Real-time partial update:', wordDetails.map(w => w.word).join(' '));
+            
+            // Update with partial data (marked as incomplete)
+            addOrUpdateMessageInChat({
+              id: messageId,
+              timestamp: new Date(),
+              speaker: speaker,
+              message: wordDetails.map(w => w.word).join(' ') + '...',
+              type: 'transcript',
+              words: wordDetails,
+              isPartial: true,
+              raw: protoMessage
+            });
+          }
+        }
+      } catch (error) {
+        // Partial decode might fail, that's okay
+        console.log('⚡ Partial decode failed (expected for incomplete data)');
+      }
+    } catch (error) {
+      // Silent fail for partial updates
+    }
+  };
+
+  // Add or update message in chat with real-time word updates
+  const addOrUpdateMessageInChat = (messageUpdate) => {
+    setChatHistory(prev => {
+      const existingIndex = prev.findIndex(existing => existing.id === messageUpdate.id);
+      
+      if (existingIndex !== -1) {
+        // Update existing message
+        console.log('🔄 Updating existing message:', messageUpdate.id);
+        const updatedHistory = [...prev];
+        const existingMessage = updatedHistory[existingIndex];
+        
+        // Merge new words with existing words, avoiding duplicates
+        let updatedWords = existingMessage.words || [];
+        if (messageUpdate.words) {
+          messageUpdate.words.forEach(newWord => {
+            // Check if this word already exists (by position/timing)
+            const existingWordIndex = updatedWords.findIndex(existing => 
+              Math.abs(existing.start - newWord.start) < 0.01 && existing.word === newWord.word
+            );
+            
+            if (existingWordIndex === -1) {
+              // New word, add it in correct position
+              updatedWords.push(newWord);
+              updatedWords.sort((a, b) => a.start - b.start); // Keep words in chronological order
+            } else {
+              // Update existing word if needed (e.g., confidence improved)
+              updatedWords[existingWordIndex] = { ...updatedWords[existingWordIndex], ...newWord };
+            }
+          });
+        }
+        
+        // Update the message
+        updatedHistory[existingIndex] = {
+          ...existingMessage,
+          message: updatedWords.map(w => w.word).join(' '), // Rebuild transcript from words
+          words: updatedWords,
+          lastUpdated: new Date(),
+          raw: messageUpdate.raw || existingMessage.raw
+        };
+        
+        console.log('✅ Message updated with', updatedWords.length, 'words');
+        return updatedHistory;
+      } else {
+        // Create new message
+        console.log('➕ Creating new message:', messageUpdate.id);
+        const newHistory = [...prev, {
+          ...messageUpdate,
+          createdAt: new Date(),
+          lastUpdated: new Date()
+        }];
+        console.log('✅ Chat history updated, new length:', newHistory.length);
+        return newHistory;
+      }
     });
   };
   
@@ -589,209 +753,104 @@ export const AgoraProvider = ({ children }) => {
         // Only handle messages from ConvoAI agent
         if (uid == getAgoraConfig().convoAIUid) {
           try {
-            // Load protobuf schema if not already loaded
-            const { SomeMessage: MessageType } = await loadProtoSchema();
-            
-            // Step 1: Decode the payload using TextDecoder
+            // Decode the payload using TextDecoder
             let decodedString = new TextDecoder().decode(payload);
-            console.log('📝 Decoded string:', decodedString);
+            //console.log('📝 Decoded string:', decodedString);
+
             
-            let messageData = '';
-            
-            // Step 2: Check if it's in chunked format (messageId|messagePart|messageChunks|messageData)
-            if (decodedString.includes('|')) {
-              let [messageId, messagePart, messageChunks, base64Data] = decodedString.split("|");
-              console.log('📦 Chunked message:', { messageId, messagePart, messageChunks });
-              
-              // Step 3: Decode the Base64 message data
-              try {
-                messageData = atob(base64Data);
-                console.log('� Base64 decoded data:', messageData.substring(0, 200) + '...');
-                
-                // Handle chunked messages - store and reassemble
-                if (!window.messagesMap) window.messagesMap = new Map();
-                window.messagesMap.set(messageId, 
-                  window.messagesMap.get(messageId) ? 
-                  window.messagesMap.get(messageId) + messageData : 
-                  messageData
-                );
-                
-                messageData = window.messagesMap.get(messageId);
-                
-                // Check if we have all chunks
-                if (parseInt(messagePart) === parseInt(messageChunks)) {
-                  window.messagesMap.delete(messageId);
-                  console.log('✅ Complete message assembled');
-                } else {
-                  console.log(`⏳ Waiting for more chunks: ${messagePart}/${messageChunks}`);
-                  return; // Wait for more chunks
-                }
-              } catch (base64Error) {
-                console.warn('❌ Base64 decode failed:', base64Error);
-                return;
-              }
-            } else {
-              // Step 4: Direct Base64 decode if no chunking
-              try {
-                messageData = atob(decodedString);
-                console.log('🔓 Direct Base64 decoded, length:', messageData.length);
-              } catch (base64Error) {
-                console.warn('❌ Direct Base64 decode failed, using original:', base64Error);
-                messageData = decodedString;
-              }
-            }
-            
-            // Step 5: Try protobuf decoding first
-            if (!messageData) {
-              console.warn('❌ messageData is empty, skipping protobuf decode');
+            // Parse message format: messageID|part|totalParts|base64Data
+            if (!decodedString.includes('|')) {
+              console.warn('⚠️ Message format invalid - missing separators');
               return;
             }
             
-            try {
-              // Convert string to Uint8Array for protobuf
-              const buffer = new Uint8Array(messageData.length);
-              for (let i = 0; i < messageData.length; i++) {
-                buffer[i] = messageData.charCodeAt(i);
-              }
-              
-              // Decode protobuf message
-              const protoMessage = MessageType.decode(buffer);
-              console.log('📋 Protobuf decoded successfully:', protoMessage);
-              
-              let transcriptText = '';
-              let speaker = 'agent';
-              let wordDetails = [];
-              
-              // Check if this is a Words message
-              if (protoMessage.words && protoMessage.words.words) {
-                console.log('✅ Found Words message with', protoMessage.words.words.length, 'words');
-                
-                // Extract words with timing information
-                wordDetails = protoMessage.words.words.map(word => ({
-                  word: word.word,
-                  start: word.start,
-                  end: word.end,
-                  confidence: word.confidence,
-                  speaker: word.speaker ? 'user' : 'agent'
-                }));
-                
-                // Create transcript text from words
-                transcriptText = wordDetails.map(w => w.word).join(' ');
-                
-                // For real-time display, we can show words as they come
-                console.log('📝 Real-time words:', wordDetails);
-                
-                // If this message contains user words, update speaker
-                if (wordDetails.some(w => w.speaker === 'user')) {
-                  speaker = 'user';
-                }
-              }
-              // Check if this is a Metadata message
-              else if (protoMessage.metadata) {
-                console.log('📋 Found Metadata message:', protoMessage.metadata);
-                transcriptText = `[Metadata] Session: ${protoMessage.metadata.session_id}`;
-                speaker = 'system';
-              }
-              else {
-                console.log('❓ Unknown protobuf message type');
-                transcriptText = `[Unknown protobuf message]`;
-                speaker = 'debug';
-              }
-              
-              // Step 6: Add to chat history only if it passes filtering
-              if (transcriptText.trim() && shouldAddToChat(protoMessage, null)) {
-                console.log('➕ Adding protobuf message to chat history...');
-                const newMessage = {
-                  id: generateUniqueId(),
-                  timestamp: new Date(),
-                  speaker: speaker,
-                  message: transcriptText.trim(),
-                  type: 'transcript',
-                  words: wordDetails.length > 0 ? wordDetails : null,
-                  raw: protoMessage
-                };
-                
-                console.log('📤 New protobuf message:', newMessage);
-                
-                setChatHistory(prev => {
-                  const newHistory = [...prev, newMessage];
-                  console.log('✅ Chat history updated with protobuf message, new length:', newHistory.length);
-                  return newHistory;
-                });
-                
-                // For real-time word-by-word display, we can set up a timer
-                if (wordDetails.length > 0) {
-                  console.log('⏰ Setting up real-time word display');
-                  // This could be expanded to show words one by one based on timing
-                }
-              }
-              
-            } catch (protobufError) {
-              console.warn('❌ Protobuf decode failed, trying JSON fallback:', protobufError);
-              
-              // Step 7: Fallback to JSON parsing
-              try {
-                const messageDataJson = JSON.parse(messageData);
-                console.log('📋 JSON fallback successful:', messageDataJson);
-                
-                let transcriptText = '';
-                let speaker = 'agent';
-                
-                // Extract text using various methods
-                if (messageDataJson.words && Array.isArray(messageDataJson.words)) {
-                  transcriptText = messageDataJson.words.map(word => word.word || word).join(' ');
-                  console.log('✅ Extracted from words array:', transcriptText);
-                } else if (messageDataJson.text) {
-                  transcriptText = messageDataJson.text;
-                  console.log('✅ Extracted from text field:', transcriptText);
-                } else if (messageDataJson.message) {
-                  transcriptText = messageDataJson.message;
-                  console.log('✅ Extracted from message field:', transcriptText);
-                } else {
-                  transcriptText = `[JSON DEBUG] ${JSON.stringify(messageDataJson)}`;
-                  speaker = 'debug';
-                  console.log('❓ No text field found in JSON, using debug format');
-                }
-                
-                // Add JSON fallback to chat history only if it passes filtering
-                const messageId = messageDataJson.id || messageDataJson.message_id || null;
-                
-                if (transcriptText.trim() && shouldAddToChat(messageDataJson, messageId)) {
-                  console.log('➕ Adding JSON fallback to chat history...');
-                  
-                  // Mark message ID as processed if available
-                  if (messageId) {
-                    setProcessedMessageIds(prev => new Set([...prev, messageId]));
-                  }
-                  
-                  const newMessage = {
-                    id: messageId || generateUniqueId(),
-                    timestamp: new Date(),
-                    speaker: speaker,
-                    message: transcriptText.trim(),
-                    type: 'transcript',
-                    raw: messageDataJson
-                  };
-                  
-                  setChatHistory(prev => {
-                    const newHistory = [...prev, newMessage];
-                    console.log('✅ Chat history updated with JSON fallback, new length:', newHistory.length);
-                    return newHistory;
-                  });
-                } else {
-                  console.log('🚫 JSON message filtered out or duplicate');
-                }
-                
-              } catch (jsonError) {
-                console.warn('❌ Both protobuf and JSON decode failed:', jsonError);
-                console.log('📄 Raw message data (first 500 chars):', messageData.substring(0, 500));
-                // Note: Not adding decode errors to chat to avoid noise
-              }
+            const parts = decodedString.split('|');
+            if (parts.length !== 4) {
+              console.warn('⚠️ Message format invalid - expected 4 parts, got:', parts.length);
+              return;
             }
             
+            const [messageId, partNumber, totalParts, base64Data] = parts;
+            const partNum = parseInt(partNumber);
+            const totalNum = parseInt(totalParts);
+            
+            console.log('📦 Message chunk:', { messageId, partNum, totalNum });
+            
+            // CRITICAL: Skip if this complete message was already processed
+            if (processedMessageIds.has(messageId)) {
+              console.log(`🔄 Ignoring duplicate complete message: ${messageId}`);
+              return;
+            }
+            
+            // Decode Base64 data
+            let messageData;
+            try {
+              messageData = atob(base64Data);
+            } catch (base64Error) {
+              console.warn('❌ Base64 decode failed:', base64Error);
+              return;
+            }
+            
+            // Handle message chunking
+            setMessageChunks(prev => {
+              const newChunks = new Map(prev);
+              
+              // Check if we already have this complete message processed
+              if (processedMessageIds.has(messageId)) {
+                console.log(`🔄 Skipping chunk for already processed message: ${messageId}`);
+                return newChunks;
+              }
+              
+              if (!newChunks.has(messageId)) {
+                newChunks.set(messageId, {
+                  parts: new Map(),
+                  totalParts: totalNum,
+                  receivedAt: Date.now()
+                });
+              }
+              
+              const messageInfo = newChunks.get(messageId);
+              
+              // Check if we already have this specific part
+              if (messageInfo.parts.has(partNum)) {
+                console.log(`🔄 Already have part ${partNum} for message ${messageId}, ignoring duplicate`);
+                return newChunks;
+              }
+              
+              messageInfo.parts.set(partNum, messageData);
+              
+              console.log(`📥 Received part ${partNum}/${totalNum} for message ${messageId} (${messageInfo.parts.size}/${totalNum} complete)`);
+              
+              // Check if we have all parts
+              if (messageInfo.parts.size === totalNum) {
+                console.log(`✅ All parts received for message ${messageId}, assembling...`);
+                
+                // Assemble complete message in correct order
+                let completeMessage = '';
+                for (let i = 1; i <= totalNum; i++) {
+                  if (messageInfo.parts.has(i)) {
+                    completeMessage += messageInfo.parts.get(i);
+                  } else {
+                    console.error(`❌ Missing part ${i} for message ${messageId}`);
+                    return newChunks; // Keep waiting
+                  }
+                }
+                
+                // Process the complete message
+                processCompleteMessage(messageId, completeMessage);
+                
+                // Remove from chunks map to save memory
+                newChunks.delete(messageId);
+              } else {
+                // Try partial update for real-time display
+                processPartialMessage(messageId, messageData);
+              }
+              
+              return newChunks;
+            });
+            
           } catch (error) {
-            console.error('❌ Error processing stream message:', error);
-            // Note: Not adding stream errors to chat to avoid noise
+            console.error('❌ Stream message processing error:', error);
           }
         }
       });
@@ -1209,9 +1268,10 @@ export const AgoraProvider = ({ children }) => {
     stopConvoAIAgent,
     triggerAgentSpeech,
     clearChatHistory: () => {
-      console.log('🗑️ Clearing chat history and processed message IDs...');
+      console.log('🗑️ Clearing chat history, processed message IDs, and message chunks...');
       setChatHistory([]);
       setProcessedMessageIds(new Set());
+      setMessageChunks(new Map());
     },
     testChatMessage: () => {
       console.log('🧪 Adding test message with word details to chat...');
@@ -1297,6 +1357,40 @@ export const AgoraProvider = ({ children }) => {
         message: 'Filter test complete! Only assistant.transcription messages will be shown in real chat.',
         type: 'test'
       }]);
+    },
+    testRealTimeUpdates: () => {
+      console.log('🧪 Testing real-time word-by-word updates...');
+      const testMessageId = 'test-realtime-' + Date.now();
+      
+      // Simulate real-time word updates
+      const words = [
+        { word: 'This', start: 0.0, end: 0.3, confidence: 0.95 },
+        { word: 'is', start: 0.4, end: 0.5, confidence: 0.99 },
+        { word: 'a', start: 0.6, end: 0.65, confidence: 0.97 },
+        { word: 'real-time', start: 0.7, end: 1.2, confidence: 0.93 },
+        { word: 'transcription', start: 1.3, end: 2.0, confidence: 0.96 },
+        { word: 'demo!', start: 2.1, end: 2.5, confidence: 0.98 }
+      ];
+      
+      // Add words one by one with delays
+      words.forEach((word, index) => {
+        setTimeout(() => {
+          const wordsUpToNow = words.slice(0, index + 1);
+          const isLast = index === words.length - 1;
+          
+          addOrUpdateMessageInChat({
+            id: testMessageId,
+            timestamp: new Date(),
+            speaker: 'agent',
+            message: wordsUpToNow.map(w => w.word).join(' ') + (isLast ? '' : '...'),
+            type: 'transcript',
+            words: wordsUpToNow,
+            isPartial: !isLast
+          });
+          
+          console.log(`⚡ Added word ${index + 1}/${words.length}: "${word.word}"`);
+        }, index * 500); // 500ms delay between words
+      });
     },
     config: getConfigStatus(),
     // Debug functions
