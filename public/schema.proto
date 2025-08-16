@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+message SomeMessage {
+  oneof data {
+    Metadata metadata = 1;
+    Words words = 2;
+  }
+}
+
+message Metadata {
+  string session_id = 1;
+  string conversation_id = 2;
+  string request_id = 3;
+}
+
+message Words {
+  repeated Word words = 1;
+}
+
+message Word {
+  string word = 1;
+  double start = 2;
+  double end = 3;
+  float confidence = 4;
+  bool speaker = 5;
+}

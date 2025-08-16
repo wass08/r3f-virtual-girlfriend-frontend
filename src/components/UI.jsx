@@ -1,14 +1,14 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useChat } from "../hooks/useChat";
 import { useAgora } from "../hooks/useAgora";
 import Settings from "./Settings";
+import { CombinedChat } from "./CombinedChat";
 
 export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAnimation, setCurrentAnimation, ...props }) => {
-  const input = useRef();
   const [showSettings, setShowSettings] = useState(false);
   
   // Panel visibility states - Avatar panels default to closed for cleaner UI
-  const [showConnectionPanel, setShowConnectionPanel] = useState(true);
+  const [showConnectionPanel, setShowConnectionPanel] = useState(false);
   const [showExpressionPanel, setShowExpressionPanel] = useState(false);
   const [showAnimationPanel, setShowAnimationPanel] = useState(false);
   
@@ -39,14 +39,6 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
     { name: "Terrified", label: "😨 Terrified", emoji: "😨" },
     // { name: "Rumba Dancing", label: "💃 Dancing", emoji: "💃" }, // Temporarily disabled - may cause crashes
   ];
-
-  const sendMessage = () => {
-    const text = input.current.value;
-    if (!loading && !message && isConnected) {
-      chat(text);
-      input.current.value = "";
-    }
-  };
 
   if (hidden) {
     return null;
@@ -161,27 +153,30 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
             )}
           </div>
           
-          {/* Settings Button (Burger Menu) */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-3 rounded-lg hover:bg-opacity-70 transition-colors"
-            title="Configuration Settings"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-6 h-6 text-gray-700"
+          {/* Settings Button */}
+          <div className="flex gap-2">
+            {/* Settings Button (Burger Menu) */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-3 rounded-lg hover:bg-opacity-70 transition-colors"
+              title="Configuration Settings"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H4.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H1.5"
-              />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-6 h-6 text-gray-700"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H4.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H1.5"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Expression Control Panel */}
@@ -341,28 +336,6 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
             </svg>
           </button>
         </div>
-        <div className="flex items-center gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
-          <input
-            className="w-full placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 bg-white backdrop-blur-md"
-            placeholder={isConnected ? "Type a message..." : "Connect to Agora first..."}
-            ref={input}
-            disabled={!isConnected}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                sendMessage();
-              }
-            }}
-          />
-          <button
-            disabled={loading || message || !isConnected}
-            onClick={sendMessage}
-            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md ${
-              loading || message || !isConnected ? "cursor-not-allowed opacity-30" : ""
-            }`}
-          >
-            Send
-          </button>
-        </div>
       </div>
       
       {/* Settings Modal */}
@@ -370,6 +343,9 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
+      
+      {/* Combined Chat Component */}
+      <CombinedChat isConnected={isConnected} />
     </>
   );
 };

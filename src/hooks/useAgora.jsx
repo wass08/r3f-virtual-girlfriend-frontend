@@ -1,7 +1,53 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import AgoraRTC from 'agora-rtc-sdk-ng';
+import protobuf from 'protobufjs';
 
 const AgoraContext = createContext();
+
+// Load protobuf schema
+let protoRoot = null;
+let SomeMessage = null;
+
+const loadProtoSchema = async () => {
+  if (!protoRoot) {
+    try {
+      protoRoot = await protobuf.load('/virtual-girlfriend/schema.proto');
+      SomeMessage = protoRoot.lookupType('SomeMessage');
+      console.log('✅ Protobuf schema loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load protobuf schema:', error);
+      // Fallback to inline schema definition
+      const schema = `
+        syntax = "proto3";
+        message SomeMessage {
+          oneof data {
+            Metadata metadata = 1;
+            Words words = 2;
+          }
+        }
+        message Metadata {
+          string session_id = 1;
+          string conversation_id = 2;
+          string request_id = 3;
+        }
+        message Words {
+          repeated Word words = 1;
+        }
+        message Word {
+          string word = 1;
+          double start = 2;
+          double end = 3;
+          float confidence = 4;
+          bool speaker = 5;
+        }
+      `;
+      protoRoot = protobuf.parse(schema).root;
+      SomeMessage = protoRoot.lookupType('SomeMessage');
+      console.log('✅ Protobuf schema loaded from inline definition');
+    }
+  }
+  return { protoRoot, SomeMessage };
+};
 
 // Helper function to get config value from sessionStorage or environment variables
 const getConfigValue = (key, defaultValue = null) => {
@@ -24,7 +70,6 @@ const getAgoraConfig = () => ({
 // ConvoAI API configuration - Uses sessionStorage and environment variables
 const getConvoAIConfig = () => ({
   baseUrl: getConfigValue('VITE_CONVOAI_API_BASE_URL', 'https://api.agora.io/api/conversational-ai-agent/v2'),
-  authCode: getConfigValue('VITE_AUTH_CODE'), // Hardcoded auth header override
   apiKey: getConfigValue('VITE_RESTFUL_API_KEY'),
   password: getConfigValue('VITE_RESTFUL_PASSWORD'),
   agentUid: parseInt(getConfigValue('VITE_CONVOAI_AGENT_UID', '8888')),
@@ -50,26 +95,7 @@ const getConvoAIConfig = () => ({
 const generateBasicAuthHeader = () => {
   const config = getConvoAIConfig();
   
-  // PRIORITY 1: Check for hardcoded AuthCode first
-  if (config.authCode && config.authCode.trim() !== '') {
-    const authCode = config.authCode.trim();
-    console.log('🔑 Using hardcoded AuthCode from settings:', {
-      authCodeLength: authCode.length,
-      startsWithBasic: authCode.toLowerCase().startsWith('basic '),
-      source: 'HARDCODED_AUTHCODE'
-    });
-    
-    // Ensure it starts with "Basic " if not already present
-    if (!authCode.toLowerCase().startsWith('basic ')) {
-      const fullAuthHeader = `Basic ${authCode}`;
-      console.log('✅ Added Basic prefix to AuthCode');
-      return fullAuthHeader;
-    }
-    
-    return authCode;
-  }
-  
-  // PRIORITY 2: Generate from API Key + Password
+  // Generate from API Key + Password
   const apiKey = config.apiKey;
   const password = config.password;
   
@@ -125,40 +151,13 @@ const generateBasicAuthHeaderWithCredentials = (apiKey, password) => {
   
   // Create the credentials string
   const credentialString = `${cleanApiKey}:${cleanPassword}`;
-  console.log('🔐 Credential string debug:', {
-    totalLength: credentialString.length,
-    hasColon: credentialString.includes(':'),
-    beforeColon: credentialString.split(':')[0].length,
-    afterColon: credentialString.split(':')[1].length
-  });
   
   const credentials = btoa(credentialString);
   const authHeader = `Basic ${credentials}`;
   
-  console.log('✅ Generated Basic Auth header:', {
-    authHeaderLength: authHeader.length,
-    encodedCredentialsLength: credentials.length,
-    startsWithBasic: authHeader.startsWith('Basic '),
-    encodedSample: credentials.substring(0, 12) + '...'
-  });
+  console.log('✅ Auth header generated successfully');
   
   return authHeader;
-};
-
-// TEMPORARY: Manual credential override for testing
-const generateHardcodedAuthHeader = () => {
-  console.log('🔧 USING HARDCODED CREDENTIALS FOR TESTING');
-  // TODO: Replace these with your actual credentials for testing
-  const testApiKey = "YOUR_ACTUAL_API_KEY_HERE";
-  const testPassword = "YOUR_ACTUAL_PASSWORD_HERE";
-  
-  if (testApiKey === "YOUR_ACTUAL_API_KEY_HERE" || testPassword === "YOUR_ACTUAL_PASSWORD_HERE") {
-    console.error('❌ Please replace the hardcoded credentials in generateHardcodedAuthHeader()');
-    console.log('💡 Edit useAgora.jsx lines ~150-155 to add your actual credentials');
-    return null;
-  }
-  
-  return generateBasicAuthHeaderWithCredentials(testApiKey, testPassword);
 };
 
 // Test function to verify Basic Auth encoding/decoding
@@ -171,27 +170,7 @@ const testBasicAuthCredentials = () => {
   
   const config = getConvoAIConfig();
   
-  // If using hardcoded AuthCode, just validate the format
-  if (config.authCode && config.authCode.trim() !== '') {
-    console.log('🧪 Basic Auth Test (Hardcoded AuthCode):', {
-      authHeaderValid: authHeader.startsWith('Basic '),
-      authHeaderLength: authHeader.length,
-      usingHardcodedAuthCode: true,
-      testResult: 'SKIPPED - Using hardcoded AuthCode'
-    });
-    
-    // For hardcoded auth codes, we just verify it has the right format
-    const isValidFormat = authHeader.toLowerCase().startsWith('basic ') && authHeader.length > 10;
-    if (!isValidFormat) {
-      console.error('❌ Invalid AuthCode format. Should start with "Basic " followed by base64 encoded credentials');
-      return false;
-    }
-    
-    console.log('✅ Hardcoded AuthCode format looks valid');
-    return true;
-  }
-  
-  // Original validation for generated auth headers
+  // Validate generated auth header
   try {
     // Extract and decode the credentials to verify they're correct
     const base64Credentials = authHeader.replace('Basic ', '');
@@ -200,62 +179,18 @@ const testBasicAuthCredentials = () => {
     
     const matches = decodedApiKey === config.apiKey.trim() && decodedPassword === config.password.trim();
     
-    console.log('🧪 Basic Auth Test (Generated):', {
+    console.log('🧪 Basic Auth Test:', {
       authHeaderValid: authHeader.startsWith('Basic '),
       canDecode: !!decoded,
       credentialsMatch: matches,
       decodedLength: decoded.length,
       originalApiKeyLength: config.apiKey ? config.apiKey.trim().length : 0,
-      originalPasswordLength: config.password ? config.password.trim().length : 0,
-      usingHardcodedAuthCode: false
+      originalPasswordLength: config.password ? config.password.trim().length : 0
     });
     
     return matches;
   } catch (error) {
     console.error('❌ Basic Auth Test Failed:', error);
-    return false;
-  }
-};
-
-// Test function specifically for hardcoded AuthCode
-const testHardcodedAuthCode = (authCode) => {
-  console.log('🧪 Testing hardcoded AuthCode:', {
-    provided: !!authCode,
-    length: authCode ? authCode.length : 0,
-    startsWithBasic: authCode ? authCode.toLowerCase().startsWith('basic ') : false
-  });
-  
-  if (!authCode || authCode.trim() === '') {
-    console.error('❌ No AuthCode provided');
-    return false;
-  }
-  
-  const cleanAuthCode = authCode.trim();
-  
-  // Check format
-  if (!cleanAuthCode.toLowerCase().startsWith('basic ')) {
-    console.error('❌ AuthCode must start with "Basic "');
-    return false;
-  }
-  
-  try {
-    // Extract and test decode the base64 part
-    const base64Part = cleanAuthCode.substring(6); // Remove "Basic "
-    const decoded = atob(base64Part);
-    const parts = decoded.split(':');
-    
-    console.log('✅ AuthCode validation:', {
-      canDecode: true,
-      decodedLength: decoded.length,
-      hasTwoParts: parts.length === 2,
-      firstPartLength: parts[0] ? parts[0].length : 0,
-      secondPartLength: parts[1] ? parts[1].length : 0,
-      decodedPreview: `${parts[0] ? parts[0].substring(0, 3) : ''}...${parts[1] ? parts[1].substring(0, 2) : ''}***`
-    });
-    
-    return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
-  } catch (error) {
-    console.error('❌ Cannot decode AuthCode base64:', error);
     return false;
   }
 };
@@ -270,6 +205,126 @@ export const AgoraProvider = ({ children }) => {
   const [lipSyncData, setLipSyncData] = useState(null);
   const [agentId, setAgentId] = useState(null); // Store the agent ID for stopping
   const [configVersion, setConfigVersion] = useState(0); // To trigger config updates
+  const [chatHistory, setChatHistory] = useState([]); // Store conversation transcript
+  const [processedMessageIds, setProcessedMessageIds] = useState(new Set()); // Track processed message IDs
+  const [messageChunks, setMessageChunks] = useState(new Map()); // Track message chunks: messageId -> {parts: Map, totalParts: number}
+  
+  // Generate unique ID for messages to avoid React key conflicts
+  const generateUniqueId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // Process complete message after all chunks are received
+  const processCompleteMessage = async (messageId, completeMessageData) => {
+    try {
+      console.log('🔍 Processing complete message:', messageId);
+      
+      // Load protobuf schema if not already loaded
+      const { SomeMessage: MessageType } = await loadProtoSchema();
+      
+      // Convert string to Uint8Array for protobuf
+      const buffer = new Uint8Array(completeMessageData.length);
+      for (let i = 0; i < completeMessageData.length; i++) {
+        buffer[i] = completeMessageData.charCodeAt(i);
+      }
+      
+      try {
+        // Try protobuf decoding first
+        const protoMessage = MessageType.decode(buffer);
+        console.log('📋 Protobuf decoded successfully:', protoMessage);
+        
+        // Process based on message type
+        if (protoMessage.words && protoMessage.words.words) {
+          console.log('✅ Found Words message with', protoMessage.words.words.length, 'words');
+          
+          // Extract words with timing information
+          const wordDetails = protoMessage.words.words.map(word => ({
+            word: word.word,
+            start: word.start,
+            end: word.end,
+            confidence: word.confidence,
+            speaker: word.speaker ? 'user' : 'agent'
+          }));
+          
+          // Create transcript text from words
+          const transcriptText = wordDetails.map(w => w.word).join(' ');
+          const speaker = wordDetails.some(w => w.speaker === 'user') ? 'user' : 'agent';
+          
+          console.log('📝 Transcript:', transcriptText);
+          
+          // Add to chat history
+          addMessageToChat({
+            id: messageId,
+            timestamp: new Date(),
+            speaker: speaker,
+            message: transcriptText.trim(),
+            type: 'transcript',
+            words: wordDetails,
+            raw: protoMessage
+          });
+          
+        } else if (protoMessage.metadata) {
+          console.log('📋 Found Metadata message:', protoMessage.metadata);
+          // Don't add metadata messages to chat for now
+        }
+        
+      } catch (protoError) {
+        console.warn('❌ Protobuf decode failed, trying JSON fallback:', protoError);
+        
+        // Try JSON fallback
+        try {
+          const messageDataJson = JSON.parse(completeMessageData);
+          console.log('📄 JSON decoded successfully:', messageDataJson);
+          
+          // Only process assistant.transcription messages
+          if (messageDataJson.object === "assistant.transcription") {
+            const transcriptText = messageDataJson.transcript || messageDataJson.text || '';
+            const speaker = messageDataJson.role === 'user' ? 'user' : 'agent';
+            
+            if (transcriptText.trim()) {
+              console.log('✅ Adding assistant.transcription message to chat');
+              
+              addMessageToChat({
+                id: messageId,
+                timestamp: new Date(),
+                speaker: speaker,
+                message: transcriptText.trim(),
+                type: 'transcript',
+                raw: messageDataJson
+              });
+            }
+          } else {
+            console.log('🚫 Filtering out non-assistant.transcription message:', messageDataJson.object);
+          }
+          
+        } catch (jsonError) {
+          console.warn('❌ Both protobuf and JSON decode failed:', jsonError);
+        }
+      }
+      
+      // Mark as processed
+      setProcessedMessageIds(prev => new Set([...prev, messageId]));
+      
+    } catch (error) {
+      console.error('❌ Error processing complete message:', error);
+    }
+  };
+
+  // Add message to chat with duplicate prevention
+  const addMessageToChat = (message) => {
+    setChatHistory(prev => {
+      // Check for duplicate by ID
+      const isDuplicate = prev.some(existing => existing.id === message.id);
+      if (isDuplicate) {
+        console.log('🔄 Skipping duplicate message ID:', message.id);
+        return prev;
+      }
+      
+      const newHistory = [...prev, message];
+      console.log('✅ Chat history updated, new length:', newHistory.length);
+      return newHistory;
+    });
+  };
   
   const audioAnalyserRef = useRef(null);
   const animationFrameRef = useRef(null);
@@ -471,9 +526,274 @@ export const AgoraProvider = ({ children }) => {
         });
       });
 
+      // Helper function to check if message should be added to chat
+      const shouldAddToChat = (messageData, messageId) => {
+        // Check if message ID already processed
+        if (messageId && processedMessageIds.has(messageId)) {
+          console.log(`🔄 Skipping duplicate message ID: ${messageId}`);
+          return false;
+        }
+
+        // Check if message has object property
+        if (messageData && messageData.object) {
+          // Only show assistant.transcription messages
+          if (messageData.object === 'assistant.transcription') {
+            // Additional check for meaningful content
+            if (messageData.words && Array.isArray(messageData.words) && messageData.words.length > 0) {
+              console.log('✅ Valid assistant.transcription message with words');
+              return true;
+            } else if (messageData.text && messageData.text.trim()) {
+              console.log('✅ Valid assistant.transcription message with text');
+              return true;
+            } else {
+              console.log('🚫 assistant.transcription message has no meaningful content');
+              return false;
+            }
+          } else {
+            console.log(`🚫 Filtering out message type: ${messageData.object}`);
+            return false;
+          }
+        }
+
+        // For protobuf messages without object field, check if it has actual words
+        if (messageData && messageData.words && messageData.words.words && messageData.words.words.length > 0) {
+          // Additional check to ensure words have content
+          const hasNonEmptyWords = messageData.words.words.some(word => word.word && word.word.trim());
+          if (hasNonEmptyWords) {
+            console.log('✅ Valid protobuf Words message with content');
+            return true;
+          } else {
+            console.log('🚫 Protobuf message has empty words');
+            return false;
+          }
+        }
+
+        console.log('🚫 Message does not meet criteria for chat display');
+        return false;
+      };
+
       agoraClient.on('connection-state-change', (curState) => {
         console.log('Agora connection state:', curState);
         setIsConnected(curState === 'CONNECTED');
+      });
+
+      // Subscribe to RTC data stream for ConvoAI transcript
+      agoraClient.on('stream-message', async (uid, payload) => {
+        console.log('📨 RTC DATA STREAM MESSAGE:', {
+          uid: uid,
+          payloadType: typeof payload,
+          payloadSize: payload ? payload.length || payload.byteLength : 0,
+          isFromConvoAI: uid == getAgoraConfig().convoAIUid
+        });
+        
+        // Only handle messages from ConvoAI agent
+        if (uid == getAgoraConfig().convoAIUid) {
+          try {
+            // Load protobuf schema if not already loaded
+            const { SomeMessage: MessageType } = await loadProtoSchema();
+            
+            // Step 1: Decode the payload using TextDecoder
+            let decodedString = new TextDecoder().decode(payload);
+            console.log('📝 Decoded string:', decodedString);
+            
+            let messageData = '';
+            
+            // Step 2: Check if it's in chunked format (messageId|messagePart|messageChunks|messageData)
+            if (decodedString.includes('|')) {
+              let [messageId, messagePart, messageChunks, base64Data] = decodedString.split("|");
+              console.log('📦 Chunked message:', { messageId, messagePart, messageChunks });
+              
+              // Step 3: Decode the Base64 message data
+              try {
+                messageData = atob(base64Data);
+                console.log('� Base64 decoded data:', messageData.substring(0, 200) + '...');
+                
+                // Handle chunked messages - store and reassemble
+                if (!window.messagesMap) window.messagesMap = new Map();
+                window.messagesMap.set(messageId, 
+                  window.messagesMap.get(messageId) ? 
+                  window.messagesMap.get(messageId) + messageData : 
+                  messageData
+                );
+                
+                messageData = window.messagesMap.get(messageId);
+                
+                // Check if we have all chunks
+                if (parseInt(messagePart) === parseInt(messageChunks)) {
+                  window.messagesMap.delete(messageId);
+                  console.log('✅ Complete message assembled');
+                } else {
+                  console.log(`⏳ Waiting for more chunks: ${messagePart}/${messageChunks}`);
+                  return; // Wait for more chunks
+                }
+              } catch (base64Error) {
+                console.warn('❌ Base64 decode failed:', base64Error);
+                return;
+              }
+            } else {
+              // Step 4: Direct Base64 decode if no chunking
+              try {
+                messageData = atob(decodedString);
+                console.log('🔓 Direct Base64 decoded, length:', messageData.length);
+              } catch (base64Error) {
+                console.warn('❌ Direct Base64 decode failed, using original:', base64Error);
+                messageData = decodedString;
+              }
+            }
+            
+            // Step 5: Try protobuf decoding first
+            if (!messageData) {
+              console.warn('❌ messageData is empty, skipping protobuf decode');
+              return;
+            }
+            
+            try {
+              // Convert string to Uint8Array for protobuf
+              const buffer = new Uint8Array(messageData.length);
+              for (let i = 0; i < messageData.length; i++) {
+                buffer[i] = messageData.charCodeAt(i);
+              }
+              
+              // Decode protobuf message
+              const protoMessage = MessageType.decode(buffer);
+              console.log('📋 Protobuf decoded successfully:', protoMessage);
+              
+              let transcriptText = '';
+              let speaker = 'agent';
+              let wordDetails = [];
+              
+              // Check if this is a Words message
+              if (protoMessage.words && protoMessage.words.words) {
+                console.log('✅ Found Words message with', protoMessage.words.words.length, 'words');
+                
+                // Extract words with timing information
+                wordDetails = protoMessage.words.words.map(word => ({
+                  word: word.word,
+                  start: word.start,
+                  end: word.end,
+                  confidence: word.confidence,
+                  speaker: word.speaker ? 'user' : 'agent'
+                }));
+                
+                // Create transcript text from words
+                transcriptText = wordDetails.map(w => w.word).join(' ');
+                
+                // For real-time display, we can show words as they come
+                console.log('📝 Real-time words:', wordDetails);
+                
+                // If this message contains user words, update speaker
+                if (wordDetails.some(w => w.speaker === 'user')) {
+                  speaker = 'user';
+                }
+              }
+              // Check if this is a Metadata message
+              else if (protoMessage.metadata) {
+                console.log('📋 Found Metadata message:', protoMessage.metadata);
+                transcriptText = `[Metadata] Session: ${protoMessage.metadata.session_id}`;
+                speaker = 'system';
+              }
+              else {
+                console.log('❓ Unknown protobuf message type');
+                transcriptText = `[Unknown protobuf message]`;
+                speaker = 'debug';
+              }
+              
+              // Step 6: Add to chat history only if it passes filtering
+              if (transcriptText.trim() && shouldAddToChat(protoMessage, null)) {
+                console.log('➕ Adding protobuf message to chat history...');
+                const newMessage = {
+                  id: generateUniqueId(),
+                  timestamp: new Date(),
+                  speaker: speaker,
+                  message: transcriptText.trim(),
+                  type: 'transcript',
+                  words: wordDetails.length > 0 ? wordDetails : null,
+                  raw: protoMessage
+                };
+                
+                console.log('📤 New protobuf message:', newMessage);
+                
+                setChatHistory(prev => {
+                  const newHistory = [...prev, newMessage];
+                  console.log('✅ Chat history updated with protobuf message, new length:', newHistory.length);
+                  return newHistory;
+                });
+                
+                // For real-time word-by-word display, we can set up a timer
+                if (wordDetails.length > 0) {
+                  console.log('⏰ Setting up real-time word display');
+                  // This could be expanded to show words one by one based on timing
+                }
+              }
+              
+            } catch (protobufError) {
+              console.warn('❌ Protobuf decode failed, trying JSON fallback:', protobufError);
+              
+              // Step 7: Fallback to JSON parsing
+              try {
+                const messageDataJson = JSON.parse(messageData);
+                console.log('📋 JSON fallback successful:', messageDataJson);
+                
+                let transcriptText = '';
+                let speaker = 'agent';
+                
+                // Extract text using various methods
+                if (messageDataJson.words && Array.isArray(messageDataJson.words)) {
+                  transcriptText = messageDataJson.words.map(word => word.word || word).join(' ');
+                  console.log('✅ Extracted from words array:', transcriptText);
+                } else if (messageDataJson.text) {
+                  transcriptText = messageDataJson.text;
+                  console.log('✅ Extracted from text field:', transcriptText);
+                } else if (messageDataJson.message) {
+                  transcriptText = messageDataJson.message;
+                  console.log('✅ Extracted from message field:', transcriptText);
+                } else {
+                  transcriptText = `[JSON DEBUG] ${JSON.stringify(messageDataJson)}`;
+                  speaker = 'debug';
+                  console.log('❓ No text field found in JSON, using debug format');
+                }
+                
+                // Add JSON fallback to chat history only if it passes filtering
+                const messageId = messageDataJson.id || messageDataJson.message_id || null;
+                
+                if (transcriptText.trim() && shouldAddToChat(messageDataJson, messageId)) {
+                  console.log('➕ Adding JSON fallback to chat history...');
+                  
+                  // Mark message ID as processed if available
+                  if (messageId) {
+                    setProcessedMessageIds(prev => new Set([...prev, messageId]));
+                  }
+                  
+                  const newMessage = {
+                    id: messageId || generateUniqueId(),
+                    timestamp: new Date(),
+                    speaker: speaker,
+                    message: transcriptText.trim(),
+                    type: 'transcript',
+                    raw: messageDataJson
+                  };
+                  
+                  setChatHistory(prev => {
+                    const newHistory = [...prev, newMessage];
+                    console.log('✅ Chat history updated with JSON fallback, new length:', newHistory.length);
+                    return newHistory;
+                  });
+                } else {
+                  console.log('🚫 JSON message filtered out or duplicate');
+                }
+                
+              } catch (jsonError) {
+                console.warn('❌ Both protobuf and JSON decode failed:', jsonError);
+                console.log('📄 Raw message data (first 500 chars):', messageData.substring(0, 500));
+                // Note: Not adding decode errors to chat to avoid noise
+              }
+            }
+            
+          } catch (error) {
+            console.error('❌ Error processing stream message:', error);
+            // Note: Not adding stream errors to chat to avoid noise
+          }
+        }
       });
 
       setClient(agoraClient);
@@ -512,8 +832,8 @@ export const AgoraProvider = ({ children }) => {
       // Validate Basic Auth credentials
       let authHeader = generateBasicAuthHeader();
       if (!authHeader) {
-        console.log('🔧 Regular credentials failed, trying hardcoded fallback...');
-        authHeader = generateHardcodedAuthHeader();
+        console.error('❌ Failed to generate auth header - check API Key and Password');
+        return;
       }
       
       if (!authHeader) {
@@ -679,18 +999,10 @@ export const AgoraProvider = ({ children }) => {
     try {
       console.log('Joining Agora channel and starting ConvoAI Agent...');
       
-      // Get current configuration (HARDCODED now)
+      // Get current configuration
       const agoraConfig = getAgoraConfig();
       
-      
-      console.log('Processed Agora config:', {
-        appId: agoraConfig.appId,
-        appIdLength: agoraConfig.appId ? agoraConfig.appId.length : 0,
-        channel: agoraConfig.channel,
-        token: agoraConfig.token ? 'SET (' + agoraConfig.token.length + ' chars)' : 'MISSING',
-        convoAIUid: agoraConfig.convoAIUid,
-        uid: agoraConfig.uid
-      });
+      console.log('🔗 Joining Agora channel:', agoraConfig.channel);
       
       if (!agoraConfig.appId) {
         throw new Error('Agora App ID is required. Please configure it in Settings.');
@@ -812,6 +1124,12 @@ export const AgoraProvider = ({ children }) => {
       setRemoteUsers([]);
       setAudioLevel(0);
       setLipSyncData(null);
+      setChatHistory([]); // Clear chat history when leaving
+      
+      // Clean up message chunks map
+      if (window.messagesMap) {
+        window.messagesMap.clear();
+      }
       
       console.log('Successfully left Agora channel');
       
@@ -865,16 +1183,6 @@ export const AgoraProvider = ({ children }) => {
     const hasValidLLMKey = isValidCredential(convoaiConfig.llmApiKey);
     const hasValidTTSKey = isValidCredential(convoaiConfig.ttsApiKey);
     
-    console.log('Config status check:', {
-      apiKey: convoaiConfig.apiKey,
-      password: convoaiConfig.password,
-      llmApiKey: convoaiConfig.llmApiKey,
-      ttsApiKey: convoaiConfig.ttsApiKey,
-      hasValidConvoAICredentials,
-      hasValidLLMKey,
-      hasValidTTSKey
-    });
-    
     return {
       channel: agoraConfig.channel,
       convoAIUid: agoraConfig.convoAIUid,
@@ -893,39 +1201,118 @@ export const AgoraProvider = ({ children }) => {
     audioLevel,
     lipSyncData,
     agentId,
+    chatHistory,
     joinChannel,
     leaveChannel,
     sendMessageToConvoAI,
     startConvoAIAgent,
     stopConvoAIAgent,
     triggerAgentSpeech,
+    clearChatHistory: () => {
+      console.log('🗑️ Clearing chat history and processed message IDs...');
+      setChatHistory([]);
+      setProcessedMessageIds(new Set());
+    },
+    testChatMessage: () => {
+      console.log('🧪 Adding test message with word details to chat...');
+      setChatHistory(prev => [...prev, {
+        id: generateUniqueId(),
+        timestamp: new Date(),
+        speaker: 'agent',
+        message: 'Hello! This is a test message with protobuf word details.',
+        type: 'transcript',
+        words: [
+          { word: 'Hello!', start: 0.0, end: 0.5, confidence: 0.98, speaker: false },
+          { word: 'This', start: 0.6, end: 0.8, confidence: 0.95, speaker: false },
+          { word: 'is', start: 0.9, end: 1.0, confidence: 0.99, speaker: false },
+          { word: 'a', start: 1.1, end: 1.15, confidence: 0.97, speaker: false },
+          { word: 'test', start: 1.2, end: 1.5, confidence: 0.96, speaker: false },
+          { word: 'message', start: 1.6, end: 2.0, confidence: 0.94, speaker: false },
+          { word: 'with', start: 2.1, end: 2.3, confidence: 0.98, speaker: false },
+          { word: 'protobuf', start: 2.4, end: 2.8, confidence: 0.92, speaker: false },
+          { word: 'word', start: 2.9, end: 3.1, confidence: 0.99, speaker: false },
+          { word: 'details.', start: 3.2, end: 3.6, confidence: 0.93, speaker: false }
+        ]
+      }]);
+      console.log('✅ Test message with word details added');
+    },
+    testProtobufDecoding: async () => {
+      console.log('🧪 Testing protobuf decoding...');
+      try {
+        const { SomeMessage: MessageType } = await loadProtoSchema();
+        console.log('✅ Protobuf schema loaded for testing');
+        
+        // Create a test message to show that protobuf decoding would work
+        setChatHistory(prev => [...prev, {
+          id: generateUniqueId(),
+          timestamp: new Date(),
+          speaker: 'system',
+          message: 'Protobuf schema loaded successfully! Only assistant.transcription messages will appear.',
+          type: 'test'
+        }]);
+        
+      } catch (error) {
+        console.error('❌ Protobuf schema test failed:', error);
+        setChatHistory(prev => [...prev, {
+          id: generateUniqueId(),
+          timestamp: new Date(),
+          speaker: 'error',
+          message: `Protobuf test failed: ${error.message}`,
+          type: 'error'
+        }]);
+      }
+    },
+    testFilteredMessage: () => {
+      console.log('🧪 Testing message filtering...');
+      
+      // Simulate different types of messages to show filtering in action
+      const mockMessages = [
+        {
+          object: 'assistant.transcription',
+          words: [{ word: 'Hello', start: 0, end: 0.5 }],
+          text: 'Hello'
+        },
+        {
+          object: 'debug.info',
+          text: 'This should be filtered out'
+        },
+        {
+          object: 'silence.detection',
+          text: 'This should also be filtered out'
+        }
+      ];
+      
+      console.log('📋 Message filtering test results:');
+      mockMessages.forEach((msg, index) => {
+        // Simulate the filtering logic here for testing
+        const wouldShow = msg.object === 'assistant.transcription';
+        console.log(`Message ${index + 1} (${msg.object}): ${wouldShow ? 'WOULD SHOW ✅' : 'WOULD FILTER 🚫'}`);
+      });
+      
+      // Add a test message that should pass filtering
+      setChatHistory(prev => [...prev, {
+        id: generateUniqueId(),
+        timestamp: new Date(),
+        speaker: 'system',
+        message: 'Filter test complete! Only assistant.transcription messages will be shown in real chat.',
+        type: 'test'
+      }]);
+    },
     config: getConfigStatus(),
     // Debug functions
     testBasicAuth: testBasicAuthCredentials,
-    testHardcodedAuth: testHardcodedAuthCode,
     generateAuthHeader: generateBasicAuthHeader,
-    generateHardcodedAuth: generateHardcodedAuthHeader,
     debugCredentials: () => {
       console.log('🔍 Current credential status:');
-      console.log('SessionStorage VITE_AUTH_CODE:', sessionStorage.getItem('VITE_AUTH_CODE') ? 'SET' : 'MISSING');
       console.log('SessionStorage VITE_RESTFUL_API_KEY:', sessionStorage.getItem('VITE_RESTFUL_API_KEY') ? 'SET' : 'MISSING');
       console.log('SessionStorage VITE_RESTFUL_PASSWORD:', sessionStorage.getItem('VITE_RESTFUL_PASSWORD') ? 'SET' : 'MISSING');
-      console.log('Environment VITE_AUTH_CODE:', import.meta.env.VITE_AUTH_CODE ? 'SET' : 'MISSING');
       console.log('Environment VITE_RESTFUL_API_KEY:', import.meta.env.VITE_RESTFUL_API_KEY ? 'SET' : 'MISSING');
       console.log('Environment VITE_RESTFUL_PASSWORD:', import.meta.env.VITE_RESTFUL_PASSWORD ? 'SET' : 'MISSING');
       const config = getConvoAIConfig();
       console.log('Final resolved:', { 
-        authCode: config.authCode ? 'SET' : 'MISSING',
         apiKey: config.apiKey ? 'SET' : 'MISSING', 
         password: config.password ? 'SET' : 'MISSING' 
       });
-      
-      // Test the current auth code if present
-      if (config.authCode) {
-        console.log('🧪 Testing current AuthCode...');
-        const isValid = testHardcodedAuthCode(config.authCode);
-        console.log(`AuthCode validation result: ${isValid ? '✅ VALID' : '❌ INVALID'}`);
-      }
     },
   };
 

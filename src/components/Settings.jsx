@@ -9,7 +9,6 @@ const Settings = ({ isOpen, onClose }) => {
     
     // ConvoAI REST API Configuration
     convoaiApiBaseUrl: '',
-    authCode: '',
     restfulApiKey: '',
     restfulPassword: '',
     convoaiAgentName: '',
@@ -42,7 +41,6 @@ const Settings = ({ isOpen, onClose }) => {
         
         // ConvoAI REST API Configuration
         convoaiApiBaseUrl: import.meta.env.VITE_CONVOAI_API_BASE_URL || 'https://api.agora.io/api/conversational-ai-agent/v2',
-        authCode: import.meta.env.VITE_AUTH_CODE || '',
         restfulApiKey: import.meta.env.VITE_RESTFUL_API_KEY || '',
         restfulPassword: import.meta.env.VITE_RESTFUL_PASSWORD || '',
         convoaiAgentName: import.meta.env.VITE_CONVOAI_AGENT_NAME || 'Virtual Girlfriend',
@@ -79,7 +77,6 @@ const Settings = ({ isOpen, onClose }) => {
       VITE_AGORA_APP_ID: settings.agoraAppId,
       VITE_AGORA_TOKEN: settings.agoraToken,
       VITE_AGORA_CHANNEL: settings.agoraChannel,
-      VITE_AUTH_CODE: settings.authCode,
       VITE_RESTFUL_API_KEY: settings.restfulApiKey,
       VITE_RESTFUL_PASSWORD: settings.restfulPassword,
       VITE_CONVOAI_AGENT_NAME: settings.convoaiAgentName,
@@ -217,23 +214,6 @@ const Settings = ({ isOpen, onClose }) => {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   The Agora ConvoAI REST API endpoint
-                </p>
-              </div>
-              
-              {/* AuthCode Field - Priority override */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Auth Code (Optional) 🔑
-                </label>
-                <textarea
-                  value={settings.authCode}
-                  onChange={(e) => handleInputChange('authCode', e.target.value)}
-                  rows={2}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
-                  placeholder="Basic YXBpLWtleTpwYXNzd29yZA=="
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  ⚡ <strong>Priority:</strong> If provided, this hardcoded Basic Auth header will be used instead of generating one from API Key + Password below
                 </p>
               </div>
               
