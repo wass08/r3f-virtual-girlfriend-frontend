@@ -128,9 +128,18 @@ const mouthMorphTargets = {
 
 let setupMode = false;
 
-export function Avatar({ currentExpression, currentAnimation, ...props }) {
+export function Avatar({ currentExpression, currentAnimation, currentAvatar = "Lyra", ...props }) {
+  // Define available avatars
+  const availableAvatars = {
+    Aurora: "Aurora.glb",
+    Celeste: "Celeste.glb", 
+    Lyra: "Lyra.glb"
+  };
+
+  // Load the selected avatar model
+  const avatarModel = availableAvatars[currentAvatar] || availableAvatars.Lyra;
   const { nodes, materials, scene } = useGLTF(
-    `${import.meta.env.BASE_URL}models/64f1a714fe61576b46f27ca2.glb`
+    `${import.meta.env.BASE_URL}models/Avatars/${avatarModel}`
   );
 
   const { message, onMessagePlayed, chat } = useChat();
@@ -173,130 +182,94 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
   // Debug: Log available animations to help fix UI
   useEffect(() => {
     console.log('Available animations:', animations.map(a => a.name));
-  }, [animations]);
+    console.log('Current avatar:', currentAvatar);
+    console.log('Avatar model path:', `${import.meta.env.BASE_URL}models/Avatars/${avatarModel}`);
+  }, [animations, currentAvatar, avatarModel]);
 
   const group = useRef();
-  const { actions, mixer } = useAnimations(animations, group);
-  const [animation, setAnimation] = useState(
-    animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name // Check if Idle animation exists otherwise use first animation
-  );
+  const animationMixer = useRef();
+  const animationActions = useRef({});
   
-  // Update animation when currentAnimation prop changes
+  // Custom animation system that works with any avatar
   useEffect(() => {
-    if (currentAnimation) {
-      // Check if the animation exists before trying to set it
-      const animationExists = animations.find(a => a.name === currentAnimation);
-      if (animationExists) {
-        setAnimation(currentAnimation);
+    if (group.current && animations.length > 0 && scene) {
+      console.log(`🎭 Setting up animations for avatar: ${currentAvatar}`);
+      console.log('Group children count:', group.current.children.length);
+      
+      // Clear previous mixer
+      if (animationMixer.current) {
+        console.log('Clearing previous animation mixer');
+        animationMixer.current.stopAllAction();
+        animationMixer.current.setTime(0);
+        animationMixer.current = null;
+      }
+
+      // Wait for the scene to be fully loaded
+      setTimeout(() => {
+        if (!group.current) return;
         
-        // Auto-map animation to facial expression if no manual expression override
-        if (!currentExpression) {
-          const animationToExpressionMap = {
-            "Idle": "",
-            "Laughing": "funnyFace",
-            "Crying": "sad", 
-            "Angry": "angry",
-            "Terrified": "surprised",
-            "Talking_0": "",
-            "Talking_1": "smile",
-            "Talking_2": "surprised"
-          };
-          
-          const mappedExpression = animationToExpressionMap[currentAnimation];
-          if (mappedExpression !== undefined) {
-            setFacialExpression(mappedExpression);
+        // Find the skeleton root (usually named "Hips")
+        let skeletonRoot = null;
+        scene.traverse((child) => {
+          if (child.type === 'Bone' && child.name === 'Hips') {
+            skeletonRoot = child;
+            console.log(`Found skeleton root: ${child.name}`);
           }
-        }
-      } else {
-        console.warn(`Animation "${currentAnimation}" not found. Available animations:`, animations.map(a => a.name));
-        // Fallback to Idle if animation doesn't exist
-        setAnimation("Idle");
-      }
-    } else if (!message) {
-      setAnimation("Idle");
-    }
-  }, [currentAnimation, message, animations, currentExpression]);
-  
-  useEffect(() => {
-    // Additional safety check before playing animation
-    if (actions[animation]) {
-      actions[animation]
-        .reset()
-        .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
-        .play();
-      return () => {
-        if (actions[animation]) {
-          actions[animation].fadeOut(0.5);
-        }
-      };
-    } else {
-      console.warn(`Animation action "${animation}" not found in actions:`, Object.keys(actions));
-    }
-  }, [animation, actions]);
+        });
 
-  const lerpMorphTarget = (target, value, speed = 0.1) => {
-    scene.traverse((child) => {
-      if (child.isSkinnedMesh && child.morphTargetDictionary) {
-        const index = child.morphTargetDictionary[target];
-        if (
-          index === undefined ||
-          child.morphTargetInfluences[index] === undefined
-        ) {
-          return;
-        }
-        child.morphTargetInfluences[index] = THREE.MathUtils.lerp(
-          child.morphTargetInfluences[index],
-          value,
-          speed
-        );
-        if (!setupMode) {
+        // Use the skeleton root or fallback to group.current
+        const animationTarget = skeletonRoot || group.current;
+        console.log(`🎯 Animation target: ${animationTarget.name || animationTarget.type}`);
+        
+        // Create new animation mixer
+        animationMixer.current = new THREE.AnimationMixer(animationTarget);
+        animationActions.current = {};
+        
+        // Create actions for all animations
+        let successCount = 0;
+        animations.forEach((clip) => {
           try {
-            set({
-              [target]: value,
-            });
-          } catch (e) {}
+            const action = animationMixer.current.clipAction(clip);
+            action.setLoop(THREE.LoopRepeat);
+            animationActions.current[clip.name] = action;
+            successCount++;
+            console.log(`✅ Created action for: ${clip.name}`);
+          } catch (error) {
+            console.warn(`❌ Failed to create action for ${clip.name}:`, error.message);
+          }
+        });
+        
+        console.log(`🎬 Animation setup complete: ${successCount}/${animations.length} actions created for ${currentAvatar}`);
+        console.log('Available actions:', Object.keys(animationActions.current));
+        
+        // Start default animation after setup
+        if (animationActions.current['Idle']) {
+          console.log('🚀 Starting default Idle animation');
+          animationActions.current['Idle'].play();
         }
+      }, 100); // Small delay to ensure scene is ready
+    }
+    
+    return () => {
+      if (animationMixer.current) {
+        console.log(`🧹 Cleaning up animations for ${currentAvatar}`);
+        animationMixer.current.stopAllAction();
+        animationMixer.current = null;
       }
-    });
-  };
-
-  // Enhanced smooth interpolation for mouth targets with easing
-  const smoothLerpMouthTarget = (target, targetValue, deltaTime) => {
-    if (!mouthTargetValues.current[target]) {
-      mouthTargetValues.current[target] = 0;
-    }
-    
-    // Faster interpolation with more visible movements
-    const isOpening = targetValue > mouthTargetValues.current[target];
-    const smoothSpeed = isOpening ? 15.0 : 18.0; // Much faster for more visible changes
-    
-    mouthTargetValues.current[target] = THREE.MathUtils.lerp(
-      mouthTargetValues.current[target],
-      targetValue,
-      1 - Math.exp(-smoothSpeed * deltaTime)
-    );
-    
-    lerpMorphTarget(target, mouthTargetValues.current[target], 0.9); // Higher lerp factor
-  };
-
-  const [blink, setBlink] = useState(false);
-  const [winkLeft, setWinkLeft] = useState(false);
-  const [winkRight, setWinkRight] = useState(false);
-  const [facialExpression, setFacialExpression] = useState("");
-  const [audio, setAudio] = useState();
-
-  // Update facial expression when currentExpression prop changes
-  useEffect(() => {
-    if (currentExpression) {
-      setFacialExpression(currentExpression);
-    } else if (!message) {
-      setFacialExpression(""); // Reset to default when no override and no message
-    }
-  }, [currentExpression, message]);
-
+    };
+  }, [currentAvatar, animations, scene]);
+  
+  // Update animation mixer on each frame and handle facial expressions
   useFrame((state, deltaTime) => {
-    !setupMode &&
-      Object.keys(nodes.EyeLeft.morphTargetDictionary).forEach((key) => {
+    // Update custom animation mixer
+    if (animationMixer.current) {
+      animationMixer.current.update(deltaTime);
+    }
+    
+    // Handle facial expressions
+    const morphMesh = getMorphTargetMesh();
+    if (!setupMode && morphMesh && morphMesh.morphTargetDictionary) {
+      Object.keys(morphMesh.morphTargetDictionary).forEach((key) => {
         const mapping = facialExpressions[facialExpression];
         if (key === "eyeBlinkLeft" || key === "eyeBlinkRight") {
           return; // eyes wink/blink are handled separately
@@ -307,6 +280,7 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
           lerpMorphTarget(key, 0, 0.1);
         }
       });
+    }
 
     lerpMorphTarget("eyeBlinkLeft", blink || winkLeft ? 1 : 0, 0.5);
     lerpMorphTarget("eyeBlinkRight", blink || winkRight ? 1 : 0, 0.5);
@@ -426,6 +400,166 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
       smoothLerpMouthTarget("mouthOpen", 0.01, deltaTime);
     }
   });
+  
+  // Legacy actions and mixer for compatibility (keeping for now)
+  const { actions, mixer } = useAnimations(animations, group);
+  const [animation, setAnimation] = useState(
+    animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name // Check if Idle animation exists otherwise use first animation
+  );
+  
+  // Update animation when currentAnimation prop changes
+  useEffect(() => {
+    if (currentAnimation) {
+      // Check if the animation exists before trying to set it
+      const animationExists = animations.find(a => a.name === currentAnimation);
+      if (animationExists) {
+        setAnimation(currentAnimation);
+        
+        // Auto-map animation to facial expression if no manual expression override
+        if (!currentExpression) {
+          const animationToExpressionMap = {
+            "Idle": "",
+            "Laughing": "funnyFace",
+            "Crying": "sad", 
+            "Angry": "angry",
+            "Terrified": "surprised",
+            "Talking_0": "",
+            "Talking_1": "smile",
+            "Talking_2": "surprised"
+          };
+          
+          const mappedExpression = animationToExpressionMap[currentAnimation];
+          if (mappedExpression !== undefined) {
+            setFacialExpression(mappedExpression);
+          }
+        }
+      } else {
+        console.warn(`Animation "${currentAnimation}" not found. Available animations:`, animations.map(a => a.name));
+        // Fallback to Idle if animation doesn't exist
+        setAnimation("Idle");
+      }
+    } else if (!message) {
+      setAnimation("Idle");
+    }
+  }, [currentAnimation, message, animations, currentExpression]);
+  
+  useEffect(() => {
+    // Play animation using custom system
+    console.log(`Attempting to play animation: ${animation} for avatar: ${currentAvatar}`);
+    console.log('Custom actions available:', Object.keys(animationActions.current));
+    
+    if (animationActions.current[animation]) {
+      console.log(`✓ Playing animation: ${animation} using custom system`);
+      
+      // Stop all other animations with fade out
+      Object.entries(animationActions.current).forEach(([name, action]) => {
+        if (name !== animation && action.isRunning()) {
+          action.fadeOut(0.3);
+        }
+      });
+      
+      // Play the requested animation with fade in
+      const action = animationActions.current[animation];
+      action.reset();
+      action.fadeIn(0.3);
+      action.play();
+      
+      return () => {
+        if (action && action.isRunning()) {
+          action.fadeOut(0.3);
+        }
+      };
+    } else {
+      console.warn(`✗ Animation "${animation}" not found in custom actions for ${currentAvatar}:`, Object.keys(animationActions.current));
+      
+      // Fallback to legacy system
+      if (actions[animation]) {
+        console.log(`Fallback: Using legacy action for ${animation}`);
+        actions[animation]
+          .reset()
+          .fadeIn(mixer && mixer.stats.actions.inUse === 0 ? 0 : 0.5)
+          .play();
+        return () => {
+          if (actions[animation]) {
+            actions[animation].fadeOut(0.5);
+          }
+        };
+      } else {
+        console.warn(`Animation "${animation}" not found in either system`);
+      }
+    }
+  }, [animation, actions, mixer, currentAvatar]);
+
+  const lerpMorphTarget = (target, value, speed = 0.1) => {
+    scene.traverse((child) => {
+      if (child.isSkinnedMesh && child.morphTargetDictionary) {
+        const index = child.morphTargetDictionary[target];
+        if (
+          index === undefined ||
+          child.morphTargetInfluences[index] === undefined
+        ) {
+          return;
+        }
+        child.morphTargetInfluences[index] = THREE.MathUtils.lerp(
+          child.morphTargetInfluences[index],
+          value,
+          speed
+        );
+        if (!setupMode) {
+          try {
+            set({
+              [target]: value,
+            });
+          } catch (e) {}
+        }
+      }
+    });
+  };
+
+  // Enhanced smooth interpolation for mouth targets with easing
+  const smoothLerpMouthTarget = (target, targetValue, deltaTime) => {
+    if (!mouthTargetValues.current[target]) {
+      mouthTargetValues.current[target] = 0;
+    }
+    
+    // Faster interpolation with more visible movements
+    const isOpening = targetValue > mouthTargetValues.current[target];
+    const smoothSpeed = isOpening ? 15.0 : 18.0; // Much faster for more visible changes
+    
+    mouthTargetValues.current[target] = THREE.MathUtils.lerp(
+      mouthTargetValues.current[target],
+      targetValue,
+      1 - Math.exp(-smoothSpeed * deltaTime)
+    );
+    
+    lerpMorphTarget(target, mouthTargetValues.current[target], 0.9); // Higher lerp factor
+  };
+
+  const [blink, setBlink] = useState(false);
+  const [winkLeft, setWinkLeft] = useState(false);
+  const [winkRight, setWinkRight] = useState(false);
+  const [facialExpression, setFacialExpression] = useState("");
+  const [audio, setAudio] = useState();
+
+  // Update facial expression when currentExpression prop changes
+  useEffect(() => {
+    if (currentExpression) {
+      setFacialExpression(currentExpression);
+    } else if (!message) {
+      setFacialExpression(""); // Reset to default when no override and no message
+    }
+  }, [currentExpression, message]);
+
+  // Helper function to get the first mesh with morph targets from current avatar
+  const getMorphTargetMesh = () => {
+    let morphTargetMesh = null;
+    scene.traverse((child) => {
+      if (!morphTargetMesh && child.isSkinnedMesh && child.morphTargetDictionary && Object.keys(child.morphTargetDictionary).length > 0) {
+        morphTargetMesh = child;
+      }
+    });
+    return morphTargetMesh;
+  };
 
   useControls("FacialExpressions", {
     chat: button(() => chat()),
@@ -453,14 +587,20 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
       setupMode = false;
     }),
     logMorphTargetValues: button(() => {
+      const morphMesh = getMorphTargetMesh();
+      if (!morphMesh || !morphMesh.morphTargetDictionary) {
+        console.log("No morph target mesh found for current avatar");
+        return;
+      }
+      
       const emotionValues = {};
-      Object.keys(nodes.EyeLeft.morphTargetDictionary).forEach((key) => {
+      Object.keys(morphMesh.morphTargetDictionary).forEach((key) => {
         if (key === "eyeBlinkLeft" || key === "eyeBlinkRight") {
           return; // eyes wink/blink are handled separately
         }
         const value =
-          nodes.EyeLeft.morphTargetInfluences[
-            nodes.EyeLeft.morphTargetDictionary[key]
+          morphMesh.morphTargetInfluences[
+            morphMesh.morphTargetDictionary[key]
           ];
         if (value > 0.01) {
           emotionValues[key] = value;
@@ -470,16 +610,21 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
     }),
   });
 
-  const [, set] = useControls("MorphTarget", () =>
-    Object.assign(
+  const [, set] = useControls("MorphTarget", () => {
+    const morphMesh = getMorphTargetMesh();
+    if (!morphMesh || !morphMesh.morphTargetDictionary) {
+      return {};
+    }
+    
+    return Object.assign(
       {},
-      ...Object.keys(nodes.EyeLeft.morphTargetDictionary).map((key) => {
+      ...Object.keys(morphMesh.morphTargetDictionary).map((key) => {
         return {
           [key]: {
             label: key,
             value: 0,
-            min: nodes.EyeLeft.morphTargetInfluences[
-              nodes.EyeLeft.morphTargetDictionary[key]
+            min: morphMesh.morphTargetInfluences[
+              morphMesh.morphTargetDictionary[key]
             ],
             max: 1,
             onChange: (val) => {
@@ -490,8 +635,8 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
           },
         };
       })
-    )
-  );
+    );
+  });
 
   useEffect(() => {
     let blinkTimeout;
@@ -577,5 +722,8 @@ export function Avatar({ currentExpression, currentAnimation, ...props }) {
   );
 }
 
-useGLTF.preload(`${import.meta.env.BASE_URL}models/64f1a714fe61576b46f27ca2.glb`);
+// Preload all avatar models
+useGLTF.preload(`${import.meta.env.BASE_URL}models/Avatars/Aurora.glb`);
+useGLTF.preload(`${import.meta.env.BASE_URL}models/Avatars/Celeste.glb`);
+useGLTF.preload(`${import.meta.env.BASE_URL}models/Avatars/Lyra.glb`);
 useGLTF.preload(`${import.meta.env.BASE_URL}models/animations.glb`);

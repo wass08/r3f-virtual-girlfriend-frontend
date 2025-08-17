@@ -8,6 +8,7 @@ import { UI } from "./components/UI";
 function App() {
   const [currentExpression, setCurrentExpression] = useState("");
   const [currentAnimation, setCurrentAnimation] = useState("");
+  const [currentAvatar, setCurrentAvatar] = useState("Lyra"); // Default to Lyra since animations were designed for it
 
   return (
     <>
@@ -18,11 +19,14 @@ function App() {
         setCurrentExpression={setCurrentExpression}
         currentAnimation={currentAnimation}
         setCurrentAnimation={setCurrentAnimation}
+        currentAvatar={currentAvatar}
+        setCurrentAvatar={setCurrentAvatar}
       />
       <Canvas shadows camera={{ position: [0, 0, 1], fov: 30 }}>
         <Experience 
           currentExpression={currentExpression} 
           currentAnimation={currentAnimation}
+          currentAvatar={currentAvatar}
         />
       </Canvas>
     </>

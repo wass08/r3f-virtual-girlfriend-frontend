@@ -4,7 +4,7 @@ import { useAgora } from "../hooks/useAgora";
 import Settings from "./Settings";
 import { CombinedChat } from "./CombinedChat";
 
-export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAnimation, setCurrentAnimation, ...props }) => {
+export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAnimation, setCurrentAnimation, currentAvatar, setCurrentAvatar, ...props }) => {
   const [showSettings, setShowSettings] = useState(false);
   
   // Panel visibility states - Combined animation panel
@@ -13,6 +13,13 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
   
   const { chat, loading, cameraZoomed, setCameraZoomed, message } = useChat();
   const { isConnected, isJoined, joinChannel, leaveChannel, audioLevel, config, agentId } = useAgora();
+
+  // Available avatars
+  const availableAvatars = [
+    { name: "Aurora", label: "🌟 Aurora", emoji: "🌟", description: "Elegant & Graceful" },
+    { name: "Celeste", label: "✨ Celeste", emoji: "✨", description: "Mystical & Enchanting" },
+    { name: "Lyra", label: "🎵 Lyra", emoji: "🎵", description: "Musical & Harmonious" },
+  ];
 
   // Available expressions for the avatar
   const availableExpressions = [
@@ -159,7 +166,13 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
                 // Compact vertical view - emojis stacked vertically
                 <div className="flex flex-col items-center gap-1 p-2">
                   <span className="text-xs font-medium mb-1">🎭</span>
-                  {availableAnimations.slice(0, 6).map((anim) => (
+                  
+                  {/* Current Avatar indicator */}
+                  <div className="text-lg mb-1 bg-blue-500 text-white w-8 h-8 rounded-md flex items-center justify-center" title={`Current Avatar: ${currentAvatar}`}>
+                    {availableAvatars.find(av => av.name === currentAvatar)?.emoji || "👤"}
+                  </div>
+                  
+                  {availableAnimations.slice(0, 5).map((anim) => (
                     <button
                       key={anim.name}
                       onClick={() => handleAnimationSelect(anim)}
@@ -189,7 +202,13 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
                   {/* Vertical control bar on the left */}
                   <div className="flex flex-col items-center gap-1 p-2 border-r border-gray-300">
                     <span className="text-xs font-medium mb-1">🎭</span>
-                    {availableAnimations.slice(0, 6).map((anim) => (
+                    
+                    {/* Current Avatar indicator */}
+                    <div className="text-lg mb-1 bg-blue-500 text-white w-8 h-8 rounded-md flex items-center justify-center" title={`Current Avatar: ${currentAvatar}`}>
+                      {availableAvatars.find(av => av.name === currentAvatar)?.emoji || "👤"}
+                    </div>
+                    
+                    {availableAnimations.slice(0, 5).map((anim) => (
                       <button
                         key={anim.name}
                         onClick={() => handleAnimationSelect(anim)}
@@ -217,32 +236,58 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
                   {/* Horizontal expanded content */}
                   <div className="p-3 flex-1">
                     <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium text-sm">🎭 Avatar Emotions</h3>
+                      <h3 className="font-medium text-sm">🎭 Avatar Control</h3>
                       <div className="text-xs text-gray-600 flex gap-2">
+                        <span>👤 {currentAvatar}</span>
                         <span>🎬 {currentAnimation || "Auto"}</span>
                         <span>😊 {currentExpression || "default"}</span>
                       </div>
                     </div>
                     
+                    {/* Avatar Selection */}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-600 mb-1">👤 Choose Avatar:</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {availableAvatars.map((avatar) => (
+                          <button
+                            key={avatar.name}
+                            onClick={() => setCurrentAvatar(avatar.name)}
+                            className={`pointer-events-auto p-2 rounded text-xs transition-colors ${
+                              currentAvatar === avatar.name
+                                ? "bg-blue-500 text-white" 
+                                : "bg-white bg-opacity-70 hover:bg-blue-200"
+                            }`}
+                            title={avatar.description}
+                          >
+                            <div className="text-lg">{avatar.emoji}</div>
+                            <div className="text-xs leading-tight">{avatar.name}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
                     {/* All animations in 4x2 grid (two rows) */}
-                    <div className="grid grid-cols-4 gap-1 mb-3">
-                      {availableAnimations.map((anim) => (
-                        <button
-                          key={anim.name}
-                          onClick={() => handleAnimationSelect(anim)}
-                          className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
-                            currentAnimation === anim.name
-                              ? "bg-purple-500 text-white" 
-                              : "bg-white bg-opacity-70 hover:bg-purple-200"
-                          }`}
-                          title={anim.label}
-                        >
-                          <div className="text-sm">{anim.emoji}</div>
-                          <div className="text-xs leading-tight">
-                            {anim.label.split(' ')[1] || anim.name.slice(0, 4)}
-                          </div>
-                        </button>
-                      ))}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-600 mb-1">🎬 Animations:</p>
+                      <div className="grid grid-cols-4 gap-1">
+                        {availableAnimations.map((anim) => (
+                          <button
+                            key={anim.name}
+                            onClick={() => handleAnimationSelect(anim)}
+                            className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
+                              currentAnimation === anim.name
+                                ? "bg-purple-500 text-white" 
+                                : "bg-white bg-opacity-70 hover:bg-purple-200"
+                            }`}
+                            title={anim.label}
+                          >
+                            <div className="text-sm">{anim.emoji}</div>
+                            <div className="text-xs leading-tight">
+                              {anim.label.split(' ')[1] || anim.name.slice(0, 4)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     
                     {/* Manual expressions - horizontal row */}

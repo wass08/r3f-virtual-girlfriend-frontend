@@ -37,7 +37,7 @@ const Dots = (props) => {
   );
 };
 
-export const Experience = ({ currentExpression, currentAnimation }) => {
+export const Experience = ({ currentExpression, currentAnimation, currentAvatar }) => {
   const cameraControls = useRef();
   const { cameraZoomed } = useChat();
 
@@ -62,8 +62,10 @@ export const Experience = ({ currentExpression, currentAnimation }) => {
       </Suspense>
       <Suspense fallback={null}>
         <Avatar 
+          key={currentAvatar} // Force remount when avatar changes
           currentExpression={currentExpression} 
           currentAnimation={currentAnimation}
+          currentAvatar={currentAvatar}
         />
       </Suspense>
       <ContactShadows opacity={0.7} />
