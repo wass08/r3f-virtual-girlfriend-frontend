@@ -94,61 +94,185 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
       <div className="fixed top-0 left-0 right-0 bottom-0 z-10 flex justify-between p-4 flex-col pointer-events-none">
         {/* Top Section with Title and Settings Button */}
         <div className="flex justify-between items-start">
-          <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <h1 className="font-black text-xl">My Virtual GF</h1>
-              <button
-                onClick={() => setShowConnectionPanel(!showConnectionPanel)}
-                className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
-                title={showConnectionPanel ? "Hide connection details" : "Show connection details"}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className={`w-4 h-4 transition-transform ${showConnectionPanel ? 'rotate-180' : ''}`}
+          <div className="flex flex-col gap-4">
+            {/* Title Panel */}
+            <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h1 className="font-black text-xl">My Virtual GF</h1>
+                <button
+                  onClick={() => setShowConnectionPanel(!showConnectionPanel)}
+                  className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
+                  title={showConnectionPanel ? "Hide connection details" : "Show connection details"}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </button>
-            </div>
-            <p>I will always love you ❤️</p>
-            {showConnectionPanel && (
-              <div className="mt-2 text-sm space-y-1">
-                <p className={`font-semibold ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
-                  {isConnected ? '🟢 Connected to Agora' : '🔴 Not connected'}
-                </p>
-                <p className="text-gray-600">
-                  Channel: <span className="font-mono">{config?.channel || 'ConvoAINPC'}</span>
-                </p>
-                <p className="text-gray-600">
-                  ConvoAI UID: <span className="font-mono">{config?.convoAIUid || '8888'}</span>
-                </p>
-                {agentId && (
-                  <p className="text-green-600">
-                    🤖 Agent Active: <span className="font-mono text-xs">{agentId}</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    className={`w-4 h-4 transition-transform ${showConnectionPanel ? 'rotate-180' : ''}`}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+              </div>
+              <p>I will always love you ❤️</p>
+              {showConnectionPanel && (
+                <div className="mt-2 text-sm space-y-1">
+                  <p className={`font-semibold ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+                    {isConnected ? '🟢 Connected to Agora' : '🔴 Not connected'}
                   </p>
-                )}
-                <div className="flex gap-2">
-                  <p className={`text-xs ${config?.hasCredentials ? 'text-green-600' : 'text-red-600'}`}>
-                    {config?.hasCredentials ? '✅' : '❌'} Auth
+                  <p className="text-gray-600">
+                    Channel: <span className="font-mono">{config?.channel || 'ConvoAINPC'}</span>
                   </p>
-                  <p className={`text-xs ${config?.hasLLMKey ? 'text-green-600' : 'text-red-600'}`}>
-                    {config?.hasLLMKey ? '✅' : '❌'} LLM
+                  <p className="text-gray-600">
+                    ConvoAI UID: <span className="font-mono">{config?.convoAIUid || '8888'}</span>
                   </p>
-                  <p className={`text-xs ${config?.hasTTSKey ? 'text-green-600' : 'text-red-600'}`}>
-                    {config?.hasTTSKey ? '✅' : '❌'} TTS
+                  {agentId && (
+                    <p className="text-green-600">
+                      🤖 Agent Active: <span className="font-mono text-xs">{agentId}</span>
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <p className={`text-xs ${config?.hasCredentials ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasCredentials ? '✅' : '❌'} Auth
+                    </p>
+                    <p className={`text-xs ${config?.hasLLMKey ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasLLMKey ? '✅' : '❌'} LLM
+                    </p>
+                    <p className={`text-xs ${config?.hasTTSKey ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasTTSKey ? '✅' : '❌'} TTS
+                    </p>
+                  </div>
+                  <p className="text-blue-600">
+                    🎤 Audio Level: {(audioLevel * 100).toFixed(1)}%
                   </p>
                 </div>
-                <p className="text-blue-600">
-                  🎤 Audio Level: {(audioLevel * 100).toFixed(1)}%
-                </p>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Vertical Avatar Emotions Panel - Now directly under the title panel */}
+            <div className={`flex backdrop-blur-md bg-white bg-opacity-50 rounded-lg transition-all duration-300 ${
+              showAnimationPanel ? 'max-w-lg' : 'max-w-fit'
+            }`}>
+              {!showAnimationPanel ? (
+                // Compact vertical view - emojis stacked vertically
+                <div className="flex flex-col items-center gap-1 p-2">
+                  <span className="text-xs font-medium mb-1">🎭</span>
+                  {availableAnimations.slice(0, 6).map((anim) => (
+                    <button
+                      key={anim.name}
+                      onClick={() => handleAnimationSelect(anim)}
+                      className={`pointer-events-auto w-8 h-8 rounded-md text-lg transition-colors ${
+                        currentAnimation === anim.name
+                          ? "bg-purple-500 text-white" 
+                          : "bg-white bg-opacity-50 hover:bg-purple-200"
+                      }`}
+                      title={anim.label}
+                    >
+                      {anim.emoji}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowAnimationPanel(true)}
+                    className="pointer-events-auto text-gray-600 hover:text-gray-800 mt-1 p-1"
+                    title="Expand emotions panel"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                // Expanded horizontal view
+                <>
+                  {/* Vertical control bar on the left */}
+                  <div className="flex flex-col items-center gap-1 p-2 border-r border-gray-300">
+                    <span className="text-xs font-medium mb-1">🎭</span>
+                    {availableAnimations.slice(0, 6).map((anim) => (
+                      <button
+                        key={anim.name}
+                        onClick={() => handleAnimationSelect(anim)}
+                        className={`pointer-events-auto w-8 h-8 rounded-md text-lg transition-colors ${
+                          currentAnimation === anim.name
+                            ? "bg-purple-500 text-white" 
+                            : "bg-white bg-opacity-50 hover:bg-purple-200"
+                        }`}
+                        title={anim.label}
+                      >
+                        {anim.emoji}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setShowAnimationPanel(false)}
+                      className="pointer-events-auto text-gray-600 hover:text-gray-800 mt-1 p-1"
+                      title="Collapse panel"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15.75 19.5-7.5-7.5 7.5-7.5" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Horizontal expanded content */}
+                  <div className="p-3 flex-1">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium text-sm">🎭 Avatar Emotions</h3>
+                      <div className="text-xs text-gray-600 flex gap-2">
+                        <span>🎬 {currentAnimation || "Auto"}</span>
+                        <span>😊 {currentExpression || "default"}</span>
+                      </div>
+                    </div>
+                    
+                    {/* All animations in 4x2 grid (two rows) */}
+                    <div className="grid grid-cols-4 gap-1 mb-3">
+                      {availableAnimations.map((anim) => (
+                        <button
+                          key={anim.name}
+                          onClick={() => handleAnimationSelect(anim)}
+                          className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
+                            currentAnimation === anim.name
+                              ? "bg-purple-500 text-white" 
+                              : "bg-white bg-opacity-70 hover:bg-purple-200"
+                          }`}
+                          title={anim.label}
+                        >
+                          <div className="text-sm">{anim.emoji}</div>
+                          <div className="text-xs leading-tight">
+                            {anim.label.split(' ')[1] || anim.name.slice(0, 4)}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* Manual expressions - horizontal row */}
+                    <div className="border-t border-gray-300 pt-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-600 whitespace-nowrap">Manual expressions:</p>
+                        <div className="flex gap-1">
+                          {availableExpressions.map((expr) => (
+                            <button
+                              key={expr.name}
+                              onClick={() => setCurrentExpression(expr.name === "default" ? "" : expr.name)}
+                              className={`pointer-events-auto w-6 h-6 rounded text-sm transition-colors ${
+                                (currentExpression === "" && expr.name === "default") || 
+                                currentExpression === expr.name
+                                  ? "bg-pink-500 text-white" 
+                                  : "bg-white bg-opacity-50 hover:bg-pink-200"
+                              }`}
+                              title={expr.label}
+                            >
+                              {expr.emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          
           {/* Join/Connect Button - Always visible */}
           <div className="flex gap-2 items-center">
             {!isJoined ? (
@@ -224,81 +348,7 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
           </div>
         </div>
 
-        {/* Combined Animation & Expression Control Panel */}
-        <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg mt-4">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-lg">🎭 Avatar Emotions</h3>
-            <button
-              onClick={() => setShowAnimationPanel(!showAnimationPanel)}
-              className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
-              title={showAnimationPanel ? "Hide animation controls" : "Show animation controls"}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className={`w-4 h-4 transition-transform ${showAnimationPanel ? 'rotate-180' : ''}`}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-          </div>
-          {showAnimationPanel && (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                {availableAnimations.map((anim) => (
-                  <button
-                    key={anim.name}
-                    onClick={() => handleAnimationSelect(anim)}
-                    className={`pointer-events-auto p-2 rounded-md text-sm font-medium transition-colors ${
-                      currentAnimation === anim.name
-                        ? "bg-purple-500 text-white" 
-                        : "bg-white bg-opacity-70 text-gray-700 hover:bg-purple-200"
-                    }`}
-                  >
-                    <div className="text-lg">{anim.emoji}</div>
-                    <div className="text-xs">{anim.label.split(' ')[1] || anim.label}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {availableExpressions.find(expr => expr.name === anim.expression)?.emoji || "😐"}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 p-2 bg-black bg-opacity-20 rounded text-xs">
-                <div className="flex justify-between">
-                  <span>Animation: <span className="font-mono">{currentAnimation || "Auto"}</span></span>
-                  <span>Expression: <span className="font-mono">{currentExpression || "default"}</span></span>
-                </div>
-                <p className="text-gray-600 mt-1">💡 Selecting an animation automatically sets the matching facial expression</p>
-              </div>
-              
-              {/* Manual Expression Override */}
-              <div className="mt-3">
-                <p className="text-xs text-gray-600 mb-2">🎭 Manual Expression Override:</p>
-                <div className="grid grid-cols-4 gap-1">
-                  {availableExpressions.map((expr) => (
-                    <button
-                      key={expr.name}
-                      onClick={() => setCurrentExpression(expr.name === "default" ? "" : expr.name)}
-                      className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
-                        (currentExpression === "" && expr.name === "default") || 
-                        currentExpression === expr.name
-                          ? "bg-pink-500 text-white" 
-                          : "bg-white bg-opacity-50 text-gray-600 hover:bg-pink-200"
-                      }`}
-                      title={expr.label}
-                    >
-                      {expr.emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
+        {/* Right-side controls */}
         <div className="w-full flex flex-col items-end justify-center gap-4">
           <button
             onClick={() => setCameraZoomed(!cameraZoomed)}

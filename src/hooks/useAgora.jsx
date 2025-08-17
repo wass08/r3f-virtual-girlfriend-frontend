@@ -496,18 +496,36 @@ export const AgoraProvider = ({ children }) => {
   // Initialize Agora client
   useEffect(() => {
     const initClient = async () => {
-      // FIXED: Use 'live' mode with 'audience' role for communication-style audio
-      const agoraClient = AgoraRTC.createClient({ 
-        mode: 'live', // Changed from 'rtc' to 'live' for better audio handling
-        codec: 'vp8' 
-      });
+      // Check if we have basic Agora configuration before creating client
+      const agoraConfig = getAgoraConfig();
       
-      // Set client role to audience initially, then switch to host when joining
-      await agoraClient.setClientRole('audience');
-      console.log('🎯 Agora client created in LIVE mode with AUDIENCE role');
+      if (!agoraConfig.appId || !agoraConfig.token) {
+        console.log('⏸️ Skipping Agora client initialization - missing credentials');
+        console.log('Missing:', {
+          appId: !agoraConfig.appId ? 'MISSING' : 'SET',
+          token: !agoraConfig.token ? 'MISSING' : 'SET'
+        });
+        return;
+      }
       
-      // Set up event handlers
-      agoraClient.on('user-published', async (user, mediaType) => {
+      try {
+        console.log('🚀 Initializing Agora client...');
+        
+        // Configure Agora for better connection handling
+        AgoraRTC.setLogLevel(1); // Reduce log verbosity to avoid WebSocket spam
+        
+        // FIXED: Use 'live' mode with 'audience' role for communication-style audio
+        const agoraClient = AgoraRTC.createClient({ 
+          mode: 'live', // Changed from 'rtc' to 'live' for better audio handling
+          codec: 'vp8' 
+        });
+        
+        // Set client role to audience initially, then switch to host when joining
+        await agoraClient.setClientRole('audience');
+        console.log('🎯 Agora client created in LIVE mode with AUDIENCE role');
+        
+        // Set up event handlers
+        agoraClient.on('user-published', async (user, mediaType) => {
         console.log('🎵 USER PUBLISHED EVENT:', {
           uid: user.uid,
           uidType: typeof user.uid,
@@ -856,6 +874,11 @@ export const AgoraProvider = ({ children }) => {
       });
 
       setClient(agoraClient);
+      
+      } catch (error) {
+        console.error('❌ Failed to initialize Agora client:', error);
+        console.log('💡 Please check your Agora App ID and Token configuration');
+      }
     };
 
     initClient();
