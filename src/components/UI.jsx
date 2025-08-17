@@ -7,9 +7,8 @@ import { CombinedChat } from "./CombinedChat";
 export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAnimation, setCurrentAnimation, ...props }) => {
   const [showSettings, setShowSettings] = useState(false);
   
-  // Panel visibility states - Avatar panels default to closed for cleaner UI
+  // Panel visibility states - Combined animation panel
   const [showConnectionPanel, setShowConnectionPanel] = useState(false);
-  const [showExpressionPanel, setShowExpressionPanel] = useState(false);
   const [showAnimationPanel, setShowAnimationPanel] = useState(false);
   
   const { chat, loading, cameraZoomed, setCameraZoomed, message } = useChat();
@@ -26,19 +25,65 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
     { name: "crazy", label: "🤯 Crazy", emoji: "🤯" },
   ];
 
-  // Available animations for the avatar (based on the files in public/animations)
+  // Combined animations with automatic facial expressions
   const availableAnimations = [
-    { name: "Idle", label: "🧘 Idle", emoji: "🧘" },
-    // { name: "Standing Idle", label: "🚶 Standing", emoji: "🚶" }, // Temporarily disabled - may cause crashes
-    { name: "Talking_0", label: "💬 Talking 1", emoji: "💬" },
-    { name: "Talking_1", label: "🗣️ Talking 2", emoji: "🗣️" },
-    { name: "Talking_2", label: "💭 Talking 3", emoji: "💭" },
-    { name: "Laughing", label: "😂 Laughing", emoji: "😂" },
-    { name: "Crying", label: "😭 Crying", emoji: "😭" },
-    { name: "Angry", label: "😡 Angry", emoji: "😡" },
-    { name: "Terrified", label: "😨 Terrified", emoji: "😨" },
-    // { name: "Rumba Dancing", label: "💃 Dancing", emoji: "💃" }, // Temporarily disabled - may cause crashes
+    { 
+      name: "Idle", 
+      label: "🧘 Idle", 
+      emoji: "🧘",
+      expression: "default" // Default expression for idle
+    },
+    { 
+      name: "Talking_0", 
+      label: "💬 Talking 1", 
+      emoji: "💬",
+      expression: "default" // Neutral talking
+    },
+    { 
+      name: "Talking_1", 
+      label: "🗣️ Talking 2", 
+      emoji: "🗣️",
+      expression: "smile" // Happy talking
+    },
+    { 
+      name: "Talking_2", 
+      label: "💭 Talking 3", 
+      emoji: "💭",
+      expression: "surprised" // Expressive talking
+    },
+    { 
+      name: "Laughing", 
+      label: "😂 Laughing", 
+      emoji: "😂",
+      expression: "smile" // Happy expression for laughing
+    },
+    { 
+      name: "Crying", 
+      label: "😭 Crying", 
+      emoji: "😭",
+      expression: "sad" // Sad expression for crying
+    },
+    { 
+      name: "Angry", 
+      label: "😡 Angry", 
+      emoji: "😡",
+      expression: "angry" // Angry expression for angry animation
+    },
+    { 
+      name: "Terrified", 
+      label: "😨 Terrified", 
+      emoji: "😨",
+      expression: "surprised" // Surprised/shocked expression for terrified
+    },
   ];
+
+  // Function to handle animation selection with automatic expression
+  const handleAnimationSelect = (animation) => {
+    setCurrentAnimation(animation.name);
+    // Automatically set the corresponding facial expression
+    setCurrentExpression(animation.expression === "default" ? "" : animation.expression);
+    console.log(`🎭 Animation: ${animation.name} → Expression: ${animation.expression}`);
+  };
 
   if (hidden) {
     return null;
@@ -179,57 +224,10 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
           </div>
         </div>
 
-        {/* Expression Control Panel */}
+        {/* Combined Animation & Expression Control Panel */}
         <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg mt-4">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-lg">🎭 Avatar Expressions</h3>
-            <button
-              onClick={() => setShowExpressionPanel(!showExpressionPanel)}
-              className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
-              title={showExpressionPanel ? "Hide expressions" : "Show expressions"}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className={`w-4 h-4 transition-transform ${showExpressionPanel ? 'rotate-180' : ''}`}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-          </div>
-          {showExpressionPanel && (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                {availableExpressions.map((expr) => (
-                  <button
-                    key={expr.name}
-                    onClick={() => setCurrentExpression(expr.name === "default" ? "" : expr.name)}
-                    className={`pointer-events-auto p-2 rounded-md text-sm font-medium transition-colors ${
-                      (currentExpression === "" && expr.name === "default") || 
-                      currentExpression === expr.name
-                        ? "bg-pink-500 text-white" 
-                        : "bg-white bg-opacity-70 text-gray-700 hover:bg-pink-200"
-                    }`}
-                  >
-                    <div className="text-lg">{expr.emoji}</div>
-                    <div className="text-xs">{expr.label.split(' ')[1]}</div>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-600 mt-2">
-                Current: <span className="font-mono">{currentExpression || "default"}</span>
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Animation Control Panel */}
-        <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg mt-4">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-lg">🎬 Avatar Animations</h3>
+            <h3 className="font-semibold text-lg">🎭 Avatar Emotions</h3>
             <button
               onClick={() => setShowAnimationPanel(!showAnimationPanel)}
               className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
@@ -253,21 +251,50 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
                 {availableAnimations.map((anim) => (
                   <button
                     key={anim.name}
-                    onClick={() => setCurrentAnimation(anim.name)}
+                    onClick={() => handleAnimationSelect(anim)}
                     className={`pointer-events-auto p-2 rounded-md text-sm font-medium transition-colors ${
                       currentAnimation === anim.name
-                        ? "bg-blue-500 text-white" 
-                        : "bg-white bg-opacity-70 text-gray-700 hover:bg-blue-200"
+                        ? "bg-purple-500 text-white" 
+                        : "bg-white bg-opacity-70 text-gray-700 hover:bg-purple-200"
                     }`}
                   >
                     <div className="text-lg">{anim.emoji}</div>
                     <div className="text-xs">{anim.label.split(' ')[1] || anim.label}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {availableExpressions.find(expr => expr.name === anim.expression)?.emoji || "😐"}
+                    </div>
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-600 mt-2">
-                Manual Override: <span className="font-mono">{currentAnimation || "Auto"}</span>
-              </p>
+              <div className="mt-3 p-2 bg-black bg-opacity-20 rounded text-xs">
+                <div className="flex justify-between">
+                  <span>Animation: <span className="font-mono">{currentAnimation || "Auto"}</span></span>
+                  <span>Expression: <span className="font-mono">{currentExpression || "default"}</span></span>
+                </div>
+                <p className="text-gray-600 mt-1">💡 Selecting an animation automatically sets the matching facial expression</p>
+              </div>
+              
+              {/* Manual Expression Override */}
+              <div className="mt-3">
+                <p className="text-xs text-gray-600 mb-2">🎭 Manual Expression Override:</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {availableExpressions.map((expr) => (
+                    <button
+                      key={expr.name}
+                      onClick={() => setCurrentExpression(expr.name === "default" ? "" : expr.name)}
+                      className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
+                        (currentExpression === "" && expr.name === "default") || 
+                        currentExpression === expr.name
+                          ? "bg-pink-500 text-white" 
+                          : "bg-white bg-opacity-50 text-gray-600 hover:bg-pink-200"
+                      }`}
+                      title={expr.label}
+                    >
+                      {expr.emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </>
           )}
         </div>
