@@ -263,5 +263,3 @@ npm run deploy
 **Real-time lip sync meets AI conversation in stunning 3D - all running in your browser!**
 
 **Live Demo**: https://chitimalli.github.io/virtual-agent/
-
-*Based on original concept by [wass08](https://github.com/wass08/r3f-virtual-girlfriend-backend) - enhanced with advanced real-time features*
