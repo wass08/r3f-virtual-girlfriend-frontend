@@ -1,17 +1,97 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { useChat } from "../hooks/useChat";
+import { useAgora } from "../hooks/useAgora";
+import Settings from "./Settings";
+import { CombinedChat } from "./CombinedChat";
 
-export const UI = ({ hidden, ...props }) => {
-  const input = useRef();
+export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAnimation, setCurrentAnimation, currentAvatar, setCurrentAvatar, ...props }) => {
+  const [showSettings, setShowSettings] = useState(false);
+  
+  // Panel visibility states - Combined animation panel
+  const [showConnectionPanel, setShowConnectionPanel] = useState(false);
+  const [showAnimationPanel, setShowAnimationPanel] = useState(false);
+  
   const { chat, loading, cameraZoomed, setCameraZoomed, message } = useChat();
+  const { isConnected, isJoined, joinChannel, leaveChannel, audioLevel, config, agentId } = useAgora();
 
-  const sendMessage = () => {
-    const text = input.current.value;
-    if (!loading && !message) {
-      chat(text);
-      input.current.value = "";
-    }
+  // Available avatars
+  const availableAvatars = [
+    { name: "Aurora", label: "🌟 Aurora", emoji: "🌟", description: "Elegant & Graceful" },
+    { name: "Celeste", label: "✨ Celeste", emoji: "✨", description: "Mystical & Enchanting" },
+    { name: "Lyra", label: "🎵 Lyra", emoji: "🎵", description: "Musical & Harmonious" },
+  ];
+
+  // Available expressions for the avatar
+  const availableExpressions = [
+    { name: "default", label: "😐 Default", emoji: "😐" },
+    { name: "smile", label: "😊 Smile", emoji: "😊" },
+    { name: "surprised", label: "😲 Surprised", emoji: "😲" },
+    { name: "funnyFace", label: "🤪 Funny", emoji: "🤪" },
+    { name: "sad", label: "😢 Sad", emoji: "😢" },
+    { name: "angry", label: "😠 Angry", emoji: "😠" },
+    { name: "crazy", label: "🤯 Crazy", emoji: "🤯" },
+  ];
+
+  // Combined animations with automatic facial expressions
+  const availableAnimations = [
+    { 
+      name: "Idle", 
+      label: "🧘 Idle", 
+      emoji: "🧘",
+      expression: "default" // Default expression for idle
+    },
+    { 
+      name: "Talking_0", 
+      label: "💬 Talking 1", 
+      emoji: "💬",
+      expression: "default" // Neutral talking
+    },
+    { 
+      name: "Talking_1", 
+      label: "🗣️ Talking 2", 
+      emoji: "🗣️",
+      expression: "smile" // Happy talking
+    },
+    { 
+      name: "Talking_2", 
+      label: "💭 Talking 3", 
+      emoji: "💭",
+      expression: "surprised" // Expressive talking
+    },
+    { 
+      name: "Laughing", 
+      label: "😂 Laughing", 
+      emoji: "😂",
+      expression: "smile" // Happy expression for laughing
+    },
+    { 
+      name: "Crying", 
+      label: "😭 Crying", 
+      emoji: "😭",
+      expression: "sad" // Sad expression for crying
+    },
+    { 
+      name: "Angry", 
+      label: "😡 Angry", 
+      emoji: "😡",
+      expression: "angry" // Angry expression for angry animation
+    },
+    { 
+      name: "Terrified", 
+      label: "😨 Terrified", 
+      emoji: "😨",
+      expression: "surprised" // Surprised/shocked expression for terrified
+    },
+  ];
+
+  // Function to handle animation selection with automatic expression
+  const handleAnimationSelect = (animation) => {
+    setCurrentAnimation(animation.name);
+    // Automatically set the corresponding facial expression
+    setCurrentExpression(animation.expression === "default" ? "" : animation.expression);
+    console.log(`🎭 Animation: ${animation.name} → Expression: ${animation.expression}`);
   };
+
   if (hidden) {
     return null;
   }
@@ -19,14 +99,306 @@ export const UI = ({ hidden, ...props }) => {
   return (
     <>
       <div className="fixed top-0 left-0 right-0 bottom-0 z-10 flex justify-between p-4 flex-col pointer-events-none">
-        <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
-          <h1 className="font-black text-xl">My Virtual GF</h1>
-          <p>I will always love you ❤️</p>
+        {/* Top Section with Title and Settings Button */}
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-4">
+            {/* Title Panel */}
+            <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h1 className="font-black text-xl">Virtual Agent 🤖</h1>
+                <button
+                  onClick={() => setShowConnectionPanel(!showConnectionPanel)}
+                  className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"
+                  title={showConnectionPanel ? "Hide connection details" : "Show connection details"}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    className={`w-4 h-4 transition-transform ${showConnectionPanel ? 'rotate-180' : ''}`}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+              </div>
+              <p>I will always love you ❤️</p>
+              {showConnectionPanel && (
+                <div className="mt-2 text-sm space-y-1">
+                  <p className={`font-semibold ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+                    {isConnected ? '🟢 Connected to Agora' : '🔴 Not connected'}
+                  </p>
+                  <p className="text-gray-600">
+                    Channel: <span className="font-mono">{config?.channel || 'ConvoAINPC'}</span>
+                  </p>
+                  <p className="text-gray-600">
+                    ConvoAI UID: <span className="font-mono">{config?.convoAIUid || '8888'}</span>
+                  </p>
+                  {agentId && (
+                    <p className="text-green-600">
+                      🤖 Agent Active: <span className="font-mono text-xs">{agentId}</span>
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <p className={`text-xs ${config?.hasCredentials ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasCredentials ? '✅' : '❌'} Auth
+                    </p>
+                    <p className={`text-xs ${config?.hasLLMKey ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasLLMKey ? '✅' : '❌'} LLM
+                    </p>
+                    <p className={`text-xs ${config?.hasTTSKey ? 'text-green-600' : 'text-red-600'}`}>
+                      {config?.hasTTSKey ? '✅' : '❌'} TTS
+                    </p>
+                  </div>
+                  <p className="text-blue-600">
+                    🎤 Audio Level: {(audioLevel * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Vertical Avatar Emotions Panel - Now directly under the title panel */}
+            <div className={`flex backdrop-blur-md bg-white bg-opacity-50 rounded-lg transition-all duration-300 ${
+              showAnimationPanel ? 'max-w-lg' : 'max-w-fit'
+            }`}>
+              {!showAnimationPanel ? (
+                // Compact vertical view - emojis stacked vertically
+                <div className="flex flex-col items-center gap-1 p-2">
+                  <span className="text-xs font-medium mb-1">🎭</span>
+                  
+                  {/* Current Avatar indicator */}
+                  <div className="text-lg mb-1 bg-blue-500 text-white w-8 h-8 rounded-md flex items-center justify-center" title={`Current Avatar: ${currentAvatar}`}>
+                    {availableAvatars.find(av => av.name === currentAvatar)?.emoji || "👤"}
+                  </div>
+                  
+                  {availableAnimations.slice(0, 5).map((anim) => (
+                    <button
+                      key={anim.name}
+                      onClick={() => handleAnimationSelect(anim)}
+                      className={`pointer-events-auto w-8 h-8 rounded-md text-lg transition-colors ${
+                        currentAnimation === anim.name
+                          ? "bg-purple-500 text-white" 
+                          : "bg-white bg-opacity-50 hover:bg-purple-200"
+                      }`}
+                      title={anim.label}
+                    >
+                      {anim.emoji}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowAnimationPanel(true)}
+                    className="pointer-events-auto text-gray-600 hover:text-gray-800 mt-1 p-1"
+                    title="Expand emotions panel"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                // Expanded horizontal view
+                <>
+                  {/* Vertical control bar on the left */}
+                  <div className="flex flex-col items-center gap-1 p-2 border-r border-gray-300">
+                    <span className="text-xs font-medium mb-1">🎭</span>
+                    
+                    {/* Current Avatar indicator */}
+                    <div className="text-lg mb-1 bg-blue-500 text-white w-8 h-8 rounded-md flex items-center justify-center" title={`Current Avatar: ${currentAvatar}`}>
+                      {availableAvatars.find(av => av.name === currentAvatar)?.emoji || "👤"}
+                    </div>
+                    
+                    {availableAnimations.slice(0, 5).map((anim) => (
+                      <button
+                        key={anim.name}
+                        onClick={() => handleAnimationSelect(anim)}
+                        className={`pointer-events-auto w-8 h-8 rounded-md text-lg transition-colors ${
+                          currentAnimation === anim.name
+                            ? "bg-purple-500 text-white" 
+                            : "bg-white bg-opacity-50 hover:bg-purple-200"
+                        }`}
+                        title={anim.label}
+                      >
+                        {anim.emoji}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setShowAnimationPanel(false)}
+                      className="pointer-events-auto text-gray-600 hover:text-gray-800 mt-1 p-1"
+                      title="Collapse panel"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15.75 19.5-7.5-7.5 7.5-7.5" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Horizontal expanded content */}
+                  <div className="p-3 flex-1">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium text-sm">🎭 Avatar Control</h3>
+                      <div className="text-xs text-gray-600 flex gap-2">
+                        <span>👤 {currentAvatar}</span>
+                        <span>🎬 {currentAnimation || "Auto"}</span>
+                        <span>😊 {currentExpression || "default"}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Avatar Selection */}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-600 mb-1">👤 Choose Avatar:</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {availableAvatars.map((avatar) => (
+                          <button
+                            key={avatar.name}
+                            onClick={() => setCurrentAvatar(avatar.name)}
+                            className={`pointer-events-auto p-2 rounded text-xs transition-colors ${
+                              currentAvatar === avatar.name
+                                ? "bg-blue-500 text-white" 
+                                : "bg-white bg-opacity-70 hover:bg-blue-200"
+                            }`}
+                            title={avatar.description}
+                          >
+                            <div className="text-lg">{avatar.emoji}</div>
+                            <div className="text-xs leading-tight">{avatar.name}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* All animations in 4x2 grid (two rows) */}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-600 mb-1">🎬 Animations:</p>
+                      <div className="grid grid-cols-4 gap-1">
+                        {availableAnimations.map((anim) => (
+                          <button
+                            key={anim.name}
+                            onClick={() => handleAnimationSelect(anim)}
+                            className={`pointer-events-auto p-1 rounded text-xs transition-colors ${
+                              currentAnimation === anim.name
+                                ? "bg-purple-500 text-white" 
+                                : "bg-white bg-opacity-70 hover:bg-purple-200"
+                            }`}
+                            title={anim.label}
+                          >
+                            <div className="text-sm">{anim.emoji}</div>
+                            <div className="text-xs leading-tight">
+                              {anim.label.split(' ')[1] || anim.name.slice(0, 4)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Manual expressions - horizontal row */}
+                    <div className="border-t border-gray-300 pt-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-600 whitespace-nowrap">Manual expressions:</p>
+                        <div className="flex gap-1">
+                          {availableExpressions.map((expr) => (
+                            <button
+                              key={expr.name}
+                              onClick={() => setCurrentExpression(expr.name === "default" ? "" : expr.name)}
+                              className={`pointer-events-auto w-6 h-6 rounded text-sm transition-colors ${
+                                (currentExpression === "" && expr.name === "default") || 
+                                currentExpression === expr.name
+                                  ? "bg-pink-500 text-white" 
+                                  : "bg-white bg-opacity-50 hover:bg-pink-200"
+                              }`}
+                              title={expr.label}
+                            >
+                              {expr.emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          {/* Join/Connect Button - Always visible */}
+          <div className="flex gap-2 items-center">
+            {!isJoined ? (
+              <button
+                onClick={joinChannel}
+                className="pointer-events-auto bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                title="Connect to ConvoAI Channel"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                  />
+                </svg>
+                Connect
+              </button>
+            ) : (
+              <button
+                onClick={leaveChannel}
+                className="pointer-events-auto bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                title="Disconnect from ConvoAI Channel"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5.25 7.5A2.25 2.25 0 017.5 9.75V15a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 15V9.75A2.25 2.25 0 013.75 7.5H5.25z"
+                  />
+                </svg>
+                Disconnect
+              </button>
+            )}
+          </div>
+          
+          {/* Settings Button */}
+          <div className="flex gap-2">
+            {/* Settings Button (Burger Menu) */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-3 rounded-lg hover:bg-opacity-70 transition-colors"
+              title="Configuration Settings"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-6 h-6 text-gray-700"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H4.5m0 6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0m-3.75 0H1.5"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Right-side controls */}
         <div className="w-full flex flex-col items-end justify-center gap-4">
           <button
             onClick={() => setCameraZoomed(!cameraZoomed)}
             className="pointer-events-auto bg-pink-500 hover:bg-pink-600 text-white p-4 rounded-md"
+            title={cameraZoomed ? "Zoom Out" : "Zoom In"}
           >
             {cameraZoomed ? (
               <svg
@@ -86,28 +458,16 @@ export const UI = ({ hidden, ...props }) => {
             </svg>
           </button>
         </div>
-        <div className="flex items-center gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
-          <input
-            className="w-full placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 bg-white backdrop-blur-md"
-            placeholder="Type a message..."
-            ref={input}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                sendMessage();
-              }
-            }}
-          />
-          <button
-            disabled={loading || message}
-            onClick={sendMessage}
-            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md ${
-              loading || message ? "cursor-not-allowed opacity-30" : ""
-            }`}
-          >
-            Send
-          </button>
-        </div>
       </div>
+      
+      {/* Settings Modal */}
+      <Settings 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+      />
+      
+      {/* Combined Chat Component */}
+      <CombinedChat isConnected={isConnected} />
     </>
   );
 };
