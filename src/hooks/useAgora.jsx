@@ -11,7 +11,7 @@ let SomeMessage = null;
 const loadProtoSchema = async () => {
   if (!protoRoot) {
     try {
-      protoRoot = await protobuf.load('/virtual-girlfriend/schema.proto');
+      protoRoot = await protobuf.load('/virtual-agent/schema.proto');
       SomeMessage = protoRoot.lookupType('SomeMessage');
       console.log('✅ Protobuf schema loaded successfully');
     } catch (error) {
@@ -62,7 +62,7 @@ const getConfigValue = (key, defaultValue = null) => {
 const getAgoraConfig = () => ({
   appId: getConfigValue('VITE_AGORA_APP_ID'),
   token: getConfigValue('VITE_AGORA_TOKEN'),
-  channel: getConfigValue('VITE_AGORA_CHANNEL', 'VirtualGirlfriend_Channel'),
+  channel: getConfigValue('VITE_AGORA_CHANNEL', 'VirtualAgent_Channel'),
   uid: null, // null for auto-generation
   convoAIUid: parseInt(getConfigValue('VITE_CONVOAI_AGENT_UID', '8888')),
 });
@@ -73,14 +73,14 @@ const getConvoAIConfig = () => ({
   apiKey: getConfigValue('VITE_RESTFUL_API_KEY'),
   password: getConfigValue('VITE_RESTFUL_PASSWORD'),
   agentUid: parseInt(getConfigValue('VITE_CONVOAI_AGENT_UID', '8888')),
-  agentName: getConfigValue('VITE_CONVOAI_AGENT_NAME', 'Virtual Girlfriend'),
+  agentName: getConfigValue('VITE_CONVOAI_AGENT_NAME', 'Virtual Agent'),
 
   // LLM Configuration
   llmUrl: getConfigValue('VITE_LLM_URL', 'https://api.openai.com/v1/chat/completions'),
   llmApiKey: getConfigValue('VITE_LLM_API_KEY'),
   llmModel: getConfigValue('VITE_LLM_MODEL', 'gpt-4o-mini'),
-  systemMessage: getConfigValue('VITE_LLM_SYSTEM_MESSAGE', 'You are a friendly virtual girlfriend assistant.'),
-  greeting: getConfigValue('VITE_LLM_GREETING', "Hello! I'm your virtual girlfriend. How can I help you today?"),
+  systemMessage: getConfigValue('VITE_LLM_SYSTEM_MESSAGE', 'You are a friendly virtual agent assistant.'),
+  greeting: getConfigValue('VITE_LLM_GREETING', "Hello! I'm your virtual agent. How can I help you today?"),
   
   // TTS Configuration
   ttsApiKey: getConfigValue('VITE_TTS_API_KEY'),
@@ -929,7 +929,7 @@ export const AgoraProvider = ({ children }) => {
       }
       
       // Generate a unique name for this agent session
-      const uniqueName = `virtual-girlfriend-${Date.now()}`;
+      const uniqueName = `virtual-agent-${Date.now()}`;
       
       // Construct the API URL - POST /projects/:appid/join
       const apiUrl = `${convoaiConfig.baseUrl}/projects/${agoraConfig.appId}/join`;

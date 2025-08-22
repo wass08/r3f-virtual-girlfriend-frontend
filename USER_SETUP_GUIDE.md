@@ -1,4 +1,4 @@
-# 🎭 Virtual Girlfriend - User Setup Guide
+# 🎭 Virtual Agent - User Setup Guide
 
 **This is a completely user-controlled application. No billing or charges to the developer!**
 
@@ -36,7 +36,7 @@ All credentials and API access must be provided by YOU, the user. This ensures:
 4. API URL is typically: `https://api.convoai.tech`
 
 ### **Step 3: Configure the Application**
-1. Open the Virtual Girlfriend app
+1. Open the Virtual Agent app
 2. Click the **Settings** button
 3. Enter all your credentials:
    - **Agora App ID**

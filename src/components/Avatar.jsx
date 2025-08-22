@@ -128,7 +128,7 @@ const mouthMorphTargets = {
 
 let setupMode = false;
 
-export function Avatar({ currentExpression, currentAnimation, currentAvatar = "Lyra", ...props }) {
+export function Avatar({ currentExpression, currentAnimation, currentAvatar = "Aurora", ...props }) {
   // Define available avatars
   const availableAvatars = {
     Aurora: "Aurora.glb",
@@ -137,7 +137,7 @@ export function Avatar({ currentExpression, currentAnimation, currentAvatar = "L
   };
 
   // Load the selected avatar model
-  const avatarModel = availableAvatars[currentAvatar] || availableAvatars.Lyra;
+  const avatarModel = availableAvatars[currentAvatar] || availableAvatars.Aurora;
   const { nodes, materials, scene } = useGLTF(
     `${import.meta.env.BASE_URL}models/Avatars/${avatarModel}`
   );

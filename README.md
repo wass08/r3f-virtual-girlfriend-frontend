@@ -1,6 +1,6 @@
-# 🎭 3D Virtual Girlfriend with Real-Time AI & Lip Sync
+# 🎭 3D Virtual Agent with Real-Time AI & Lip Sync
 
-**Live Demo**: https://chitimalli.github.io/virtual-girlfriend/
+**Live Demo**: https://chitimalli.github.io/virtual-agent/
 
 > **Advanced 3D Avatar with Agora ConvoAI Integration and Real-Time Lip Synchronization**
 
@@ -72,7 +72,7 @@ F: { jawOpen: 0.1, mouthOpen: 0.2, mouthFunnel: 0.3 }
 ## 🚀 Quick Start
 
 ### 1. **Access the App**
-Visit: https://chitimalli.github.io/virtual-girlfriend/
+Visit: https://chitimalli.github.io/virtual-agent/
 
 ### 2. **Configure APIs**
 Click **Settings** and enter your credentials:
@@ -189,8 +189,8 @@ You provide all API credentials and control spending:
 ### **Local Development**
 ```bash
 # Clone repository
-git clone https://github.com/chitimalli/virtual-girlfriend.git
-cd virtual-girlfriend
+git clone https://github.com/chitimalli/virtual-agent.git
+cd virtual-agent
 
 # Install dependencies
 npm install
@@ -262,6 +262,6 @@ npm run deploy
 
 **Real-time lip sync meets AI conversation in stunning 3D - all running in your browser!**
 
-**Live Demo**: https://chitimalli.github.io/virtual-girlfriend/
+**Live Demo**: https://chitimalli.github.io/virtual-agent/
 
 *Based on original concept by [wass08](https://github.com/wass08/r3f-virtual-girlfriend-backend) - enhanced with advanced real-time features*

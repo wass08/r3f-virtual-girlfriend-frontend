@@ -105,7 +105,7 @@ export const UI = ({ hidden, currentExpression, setCurrentExpression, currentAni
             {/* Title Panel */}
             <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <h1 className="font-black text-xl">My Virtual GF</h1>
+                <h1 className="font-black text-xl">Virtual Agent 🤖</h1>
                 <button
                   onClick={() => setShowConnectionPanel(!showConnectionPanel)}
                   className="pointer-events-auto text-gray-600 hover:text-gray-800 transition-colors"

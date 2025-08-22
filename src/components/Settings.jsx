@@ -37,21 +37,21 @@ const Settings = ({ isOpen, onClose }) => {
         // Agora Configuration
         agoraAppId: import.meta.env.VITE_AGORA_APP_ID || '',
         agoraToken: import.meta.env.VITE_AGORA_TOKEN || '',
-        agoraChannel: import.meta.env.VITE_AGORA_CHANNEL || 'VirtualGirlfriend_Channel',
+        agoraChannel: import.meta.env.VITE_AGORA_CHANNEL || 'VirtualAgent_Channel',
         
         // ConvoAI REST API Configuration
         convoaiApiBaseUrl: import.meta.env.VITE_CONVOAI_API_BASE_URL || 'https://api.agora.io/api/conversational-ai-agent/v2',
         restfulApiKey: import.meta.env.VITE_RESTFUL_API_KEY || '',
         restfulPassword: import.meta.env.VITE_RESTFUL_PASSWORD || '',
-        convoaiAgentName: import.meta.env.VITE_CONVOAI_AGENT_NAME || 'Virtual Girlfriend',
+        convoaiAgentName: import.meta.env.VITE_CONVOAI_AGENT_NAME || 'Virtual Agent',
         convoaiAgentUid: import.meta.env.VITE_CONVOAI_AGENT_UID || '8888',
         
         // LLM Configuration
         llmUrl: import.meta.env.VITE_LLM_URL || 'https://api.openai.com/v1/chat/completions',
         llmApiKey: import.meta.env.VITE_LLM_API_KEY || '',
         llmModel: import.meta.env.VITE_LLM_MODEL || 'gpt-4o-mini',
-        llmSystemMessage: import.meta.env.VITE_LLM_SYSTEM_MESSAGE || 'You are a friendly virtual girlfriend assistant.',
-        llmGreeting: import.meta.env.VITE_LLM_GREETING || "Hello! I'm your virtual girlfriend. How can I help you today?",
+        llmSystemMessage: import.meta.env.VITE_LLM_SYSTEM_MESSAGE || 'You are a friendly virtual agent assistant.',
+        llmGreeting: import.meta.env.VITE_LLM_GREETING || "Hello! I'm your virtual agent. How can I help you today?",
         
         // TTS Configuration
         ttsApiKey: import.meta.env.VITE_TTS_API_KEY || '',
@@ -119,18 +119,18 @@ const Settings = ({ isOpen, onClose }) => {
     setSettings({
       agoraAppId: '',
       agoraToken: '',
-      agoraChannel: 'VirtualGirlfriend_Channel',
+      agoraChannel: 'VirtualAgent_Channel',
       convoaiApiBaseUrl: 'https://api.agora.io/api/conversational-ai-agent/v2',
       authCode: '',
       restfulApiKey: '',
       restfulPassword: '',
-      convoaiAgentName: 'Virtual Girlfriend',
+      convoaiAgentName: 'Virtual Agent',
       convoaiAgentUid: '8888',
       llmUrl: 'https://api.openai.com/v1/chat/completions',
       llmApiKey: '',
       llmModel: 'gpt-4o-mini',
-      llmSystemMessage: 'You are a friendly virtual girlfriend assistant.',
-      llmGreeting: "Hello! I am your virtual girlfriend. How can I help you today?",
+      llmSystemMessage: 'You are a friendly virtual agent assistant.',
+      llmGreeting: "Hello! I am your virtual agent. How can I help you today?",
       ttsApiKey: '',
       ttsRegion: 'eastus',
       ttsVoiceName: 'en-US-AriaNeural',
@@ -179,7 +179,7 @@ const Settings = ({ isOpen, onClose }) => {
                   value={settings.agoraChannel}
                   onChange={(e) => handleInputChange('agoraChannel', e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="VirtualGirlfriend_Channel"
+                  placeholder="VirtualAgent_Channel"
                 />
               </div>
               <div className="md:col-span-2">
@@ -250,7 +250,7 @@ const Settings = ({ isOpen, onClose }) => {
                   value={settings.convoaiAgentName}
                   onChange={(e) => handleInputChange('convoaiAgentName', e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Virtual Girlfriend"
+                  placeholder="Virtual Agent"
                 />
               </div>
               <div>
@@ -323,7 +323,7 @@ const Settings = ({ isOpen, onClose }) => {
                   onChange={(e) => handleInputChange('llmSystemMessage', e.target.value)}
                   rows={2}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="You are a friendly virtual girlfriend assistant."
+                  placeholder="You are a friendly virtual agent assistant."
                 />
               </div>
               <div className="md:col-span-2">
@@ -335,7 +335,7 @@ const Settings = ({ isOpen, onClose }) => {
                   onChange={(e) => handleInputChange('llmGreeting', e.target.value)}
                   rows={2}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Hello! I'm your virtual girlfriend. How can I help you today?"
+                  placeholder="Hello! I'm your virtual agent. How can I help you today?"
                 />
               </div>
             </div>

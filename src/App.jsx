@@ -8,7 +8,7 @@ import { UI } from "./components/UI";
 function App() {
   const [currentExpression, setCurrentExpression] = useState("");
   const [currentAnimation, setCurrentAnimation] = useState("");
-  const [currentAvatar, setCurrentAvatar] = useState("Lyra"); // Default to Lyra since animations were designed for it
+  const [currentAvatar, setCurrentAvatar] = useState("Aurora"); // Default to Aurora
 
   return (
     <>

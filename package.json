@@ -1,5 +1,5 @@
 {
-  "name": "r3f-vite-starter",
+  "name": "virtual-agent",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "lint": "echo 'Linting not configured yet'",
+    "test": "echo 'Tests not configured yet'",
+    "analyze": "npx vite-bundle-analyzer dist"
   },
   "dependencies": {
     "@react-three/drei": "9.75.0",
